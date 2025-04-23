@@ -156,8 +156,14 @@ export default function MobileAuth() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const register = params.get('register');
+      const urlUsername = params.get('username');
+      
       if (register === 'true') {
         setIsForceRegistration(true);
+      }
+      
+      if (urlUsername) {
+        setUsername(urlUsername);
       }
     }
   }, []);
