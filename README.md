@@ -4,11 +4,11 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-web%20%7C%20mobile-orange)
 
-## 🔑 Overview
+## Overview
 
 FastKey is a modern biometric authentication system that enables seamless and secure login across devices using fingerprint or facial recognition. By leveraging WebAuthn standards and device biometrics, FastKey eliminates the need for passwords while providing enterprise-grade security.
 
-## ✨ Key Features
+## Key Features
 
 - **Passwordless Authentication**: Login using your device's biometric features (fingerprint, Face ID)
 - **Cross-Device Authentication**: Authenticate on desktop by scanning a QR code with your mobile device
@@ -18,7 +18,7 @@ FastKey is a modern biometric authentication system that enables seamless and se
 - **Offline Compatibility**: Works even when connection between devices is unstable
 - **Device Management**: Track and manage authenticated devices
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 ### Backend
 - **Node.js** with **Express**
@@ -34,7 +34,7 @@ FastKey is a modern biometric authentication system that enables seamless and se
 - **Framer Motion** for animations
 - **Socket.io Client** for real-time updates
 
-## 🏗️ Architecture
+## Architecture
 
 FastKey uses a three-part architecture:
 
@@ -50,20 +50,20 @@ FastKey uses a three-part architecture:
 4. Mobile device prompts for biometric verification
 5. After successful verification, desktop is automatically authenticated
 
-## 📋 Prerequisites
+## Prerequisites
 
 - Node.js 16.x or higher
 - NPM 8.x or higher
 - A mobile device with biometric capabilities
 - A desktop/laptop with a camera (for QR code scanning)
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Installation
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/fastkey.git
+git clone https://github.com/s000ik/fastkey.git
 cd fastkey
 ```
 
@@ -111,7 +111,7 @@ npm run dev
    - Desktop interface: `http://localhost:3000`
    - Mobile interface (when scanning QR): Will direct to appropriate URL
 
-## 🔒 Security Considerations
+## Security Considerations
 
 - FastKey uses WebAuthn standards which are resistant to phishing and replay attacks
 - All communication between devices is secured
@@ -119,7 +119,7 @@ npm run dev
 - Session tokens are encrypted and short-lived
 - Challenge-response mechanisms prevent MITM attacks
 
-## 🌐 Deployment
+## Deployment
 
 ### Backend Deployment
 
@@ -142,7 +142,7 @@ vercel
 
 Remember to set the environment variables on your hosting platforms.
 
-## 📱 Supported Devices
+## Supported Devices
 
 - **Mobile Authentication**:
   - iOS 14.5+ (Safari)
@@ -154,16 +154,13 @@ Remember to set the environment variables on your hosting platforms.
   - Firefox on Windows/macOS
   - Safari on macOS
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🙏 Acknowledgements
+## Acknowledgements
 
 - [WebAuthn.io](https://webauthn.io/) for educational resources
 - [Socket.io](https://socket.io/) for real-time communications
 - [FIDO Alliance](https://fidoalliance.org/) for the WebAuthn standard
 
----
-
-*Made by Satwik Singh*
