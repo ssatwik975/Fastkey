@@ -325,13 +325,9 @@ io.on('connection', (socket) => {
       
       console.log(`QR requested for ${username}, registration: ${isRegistration}, socket: ${socket.id}`);
       
-      // Generate a QR code URL that points to the auth page
-      let url;
-      if (rpId.includes('ngrok-free.app')) {
-        url = `https://${rpId}/mobile-auth/${sessionId}${isRegistration ? '?register=true' : ''}`;
-      } else {
-        url = `http://${rpId}:3000/mobile-auth/${sessionId}${isRegistration ? '?register=true' : ''}`;
-      }
+      // Using environment variable for frontend URL
+      const frontendUrl = process.env.FRONTEND_URL || 'https://fastkey-frontend.vercel.app';
+      const url = `${frontendUrl}/mobile-auth/${sessionId}${isRegistration ? '?register=true' : ''}`;
       
       console.log(`Generated QR URL: ${url}`);
       

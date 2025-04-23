@@ -25,9 +25,7 @@ export default function Dashboard() {
     setUser({ username });
     
     // Use the appropriate backend URL
-    const backendUrl = window.location.hostname.includes('ngrok-free.app') 
-      ? 'https://c3b3-2405-201-3003-30e9-405c-7849-c877-6bd2.ngrok-free.app'  // Replace with your backend ngrok URL
-      : 'http://localhost:5001';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5001';
     
     const newSocket = io(backendUrl);
     setSocket(newSocket);
