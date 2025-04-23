@@ -12,28 +12,52 @@ export default function Dashboard() {
   const [socket, setSocket] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const router = useRouter();
+  const [authChecked, setAuthChecked] = useState(false);
 
-  // Initialize socket connection
+  // Check authentication first before any operations
   useEffect(() => {
     const token = localStorage.getItem('token');
     const username = localStorage.getItem('username');
-    const deviceId = localStorage.getItem('deviceId');
+    
+    console.log("Auth check - Token exists:", !!token, "Username exists:", !!username);
     
     if (!token || !username) {
+      console.log("Missing auth credentials, redirecting to login");
       router.push('/');
       return;
     }
     
+    // Mark auth as checked so we don't redirect unnecessarily
+    setAuthChecked(true);
     setUser({ username });
+  }, [router]);
+
+  // Initialize socket connection only after auth is confirmed
+  useEffect(() => {
+    if (!authChecked || !user) return;
+    
+    const token = localStorage.getItem('token');
+    const username = localStorage.getItem('username');
+    const deviceId = localStorage.getItem('deviceId');
     
     // Use the consistent API base URL from environment
     const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5001';
+    console.log("Connecting to socket at:", API_BASE_URL);
     
     const newSocket = io(API_BASE_URL, {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
-      timeout: 20000
+      timeout: 20000,
+      auth: { token } // Add token to socket connection for auth
+    });
+    
+    newSocket.on('connect', () => {
+      console.log("Socket connected successfully");
+    });
+    
+    newSocket.on('connect_error', (err) => {
+      console.error("Socket connection error:", err);
     });
     
     setSocket(newSocket);
@@ -45,45 +69,54 @@ export default function Dashboard() {
     
     // Clean up on unmount
     return () => {
+      console.log("Disconnecting socket");
       newSocket.disconnect();
     };
-  }, [router]);
+  }, [authChecked, user]);
 
   // Fetch protected data on component mount with correct API URL handling
   useEffect(() => {
     async function fetchProtectedData() {
+      if (!authChecked || !user) return;
+      
       try {
         const token = localStorage.getItem('token');
         if (!token) return;
         
         // Use the consistent API base URL from environment
         const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5001';
+        console.log("Fetching protected data from:", `${API_BASE_URL}/api/protected`);
         
         const response = await fetch(`${API_BASE_URL}/api/protected`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
           },
+          credentials: 'include' // Include cookies if any
         });
+        
+        console.log("Protected API status:", response.status);
         
         if (response.ok) {
           const data = await response.json();
+          console.log("Protected data received:", data);
           setProtectedData(data);
           setLoading(false);
-        } else {
-          console.error('Protected API returned status:', response.status);
-          
-          // Don't immediately log out - only on 401 Unauthorized
-          if (response.status === 401) {
-            // If the token is invalid, redirect to login
+        } else if (response.status === 401) {
+          console.error('Authentication failed with 401 status');
+          // Add a small delay before redirect to avoid infinite loops
+          setTimeout(() => {
             localStorage.removeItem('token');
             localStorage.removeItem('username');
             localStorage.removeItem('deviceId');
             router.push('/');
-          } else {
-            setProtectedData({ error: 'Could not fetch protected data' });
-            setLoading(false);
-          }
+          }, 500);
+        } else {
+          console.error('Protected API returned error status:', response.status);
+          // Don't redirect for other errors, just show an error state
+          setProtectedData({ error: `Error ${response.status}: Could not fetch protected data` });
+          setLoading(false);
         }
       } catch (error) {
         console.error('Error fetching protected data:', error);
@@ -93,13 +126,18 @@ export default function Dashboard() {
     }
     
     fetchProtectedData();
-  }, [router]);
+  }, [authChecked, user, router]);
 
   const handleLogout = () => {
+    console.log("Logging out");
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     localStorage.removeItem('deviceId');
-    router.push('/');
+    
+    // Add a small delay to ensure localStorage is cleared
+    setTimeout(() => {
+      router.push('/');
+    }, 100);
   };
 
   if (loading) {
