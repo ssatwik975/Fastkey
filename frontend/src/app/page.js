@@ -140,6 +140,7 @@ export default function Home() {
       console.log('QR code generated:', data);
       setQrData(data);
       setStatus('qr');
+      setMessage(''); // Clear the loading message
       setAuthMode(data.isRegistration ? 'register' : 'login');
     });
 
