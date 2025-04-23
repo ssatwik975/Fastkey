@@ -965,6 +965,24 @@ app.get('/api/protected', passport.authenticate('jwt', { session: false }), (req
   });
 });
 
+// Simple homepage for health checks and keep-alive pings
+app.get('/', (req, res) => {
+  const uptime = process.uptime();
+  const uptimeHours = Math.floor(uptime / 3600);
+  const uptimeMinutes = Math.floor((uptime % 3600) / 60);
+  const uptimeSeconds = Math.floor(uptime % 60);
+  
+  res.json({
+    status: 'online',
+    service: 'FastKey Authentication API',
+    version: '1.0.0',
+    uptime: `${uptimeHours}h ${uptimeMinutes}m ${uptimeSeconds}s`,
+    timestamp: new Date().toISOString(),
+    pendingAuthSessions: pendingAuths.size,
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
 // Start server
 const PORT = process.env.PORT || 5001;
 server.listen(PORT, () => {
