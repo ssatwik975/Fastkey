@@ -8,7 +8,7 @@
 
 **Submitted to:** Dr. Arpita Bhargava
 
-**Deployed at:** [https://fastkey.ssatwik.click/](https://fastkey.ssatwik.click/)
+**Deployed at:** [https://fastkey.satwik.in/](https://fastkey.satwik.in/)
 
 ## 1. Summary
 
