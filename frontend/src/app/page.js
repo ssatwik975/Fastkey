@@ -18,6 +18,7 @@ export default function Home() {
   const [status, setStatus] = useState('initial'); // initial, loading, qr, success
   const [isRegistration, setIsRegistration] = useState(false);
   const [authMode, setAuthMode] = useState('login');
+  const [hasMobileDevices, setHasMobileDevices] = useState(false);
   const router = useRouter();
   
   const API_BASE_URL = getApiBaseUrl();
@@ -163,6 +164,35 @@ export default function Home() {
     }
   }, [router]);
 
+  // Check if username exists
+  const checkUsername = async (username) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/check-username`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username }),
+      });
+      
+      const data = await response.json();
+      const { exists, hasMobileDevices } = data;
+      
+      setHasMobileDevices(hasMobileDevices);
+      
+      // Validate username availability for registration
+      if (isRegistration && exists) {
+        setStatus('initial');
+        setMessage('This username is already taken. Please choose another username or login instead.');
+        return;
+      }
+      
+      return true;
+    } catch (error) {
+      setMessage('Connection issues. Please try again later.');
+      setStatus('initial');
+      return false;
+    }
+  };
+
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -175,23 +205,11 @@ export default function Home() {
     setStatus('loading');
     setMessage(isRegistration ? 'Setting up your secure passkey...' : 'Preparing your secure login...');
     
+    // Check username availability
+    const isUsernameValid = await checkUsername(username);
+    if (!isUsernameValid) return;
+    
     try {
-      // Check if username exists
-      const response = await fetch(`${API_BASE_URL}/api/check-username`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username }),
-      });
-      
-      const data = await response.json();
-      
-      // Validate username availability for registration
-      if (isRegistration && data.exists) {
-        setStatus('initial');
-        setMessage('This username is already taken. Please choose another username or login instead.');
-        return;
-      }
-      
       // Request QR code generation through socket
       socket.emit('requestQR', { username, isRegistration });
     } catch (error) {
@@ -324,6 +342,20 @@ export default function Home() {
                       {isRegistration ? 'Create Secure Passkey' : 'Continue with Passkey'}
                     </button>
                   </form>
+
+                  {hasMobileDevices && (
+                    <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-200 text-sm">
+                      <div className="flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-blue-800 font-medium">Mobile App Available</span>
+                      </div>
+                      <p className="ml-7 mt-1 text-blue-700">
+                        You have the FastKey mobile app registered. Check your app for a login notification.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4">
                     <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2 flex items-center">

@@ -1,0 +1,90 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+class ApiResponse {
+  final bool success;
+  final String? errorMessage;
+  final dynamic data;
+
+  ApiResponse({
+    required this.success,
+    this.errorMessage,
+    this.data,
+  });
+}
+
+class ApiService {
+  // In a production app, you'd use a config file or environment variables
+  static const String baseUrl = 'https://fastkey.onrender.com/api';
+  // For local development, use your local IP address instead of localhost
+  // static const String baseUrl = 'http://192.168.1.x:5001/api';
+
+  final http.Client _client = http.Client();
+
+  Future<ApiResponse> post(String endpoint, Map<String, dynamic> body, {String? token}) async {
+    try {
+      final headers = {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
+
+      final response = await _client.post(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: headers,
+        body: jsonEncode(body),
+      );
+
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return ApiResponse(
+          success: true,
+          data: responseData,
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          errorMessage: responseData['error'] ?? 'Unknown error occurred',
+        );
+      }
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        errorMessage: 'Network error: ${e.toString()}',
+      );
+    }
+  }
+
+  Future<ApiResponse> get(String endpoint, {String? token}) async {
+    try {
+      final headers = {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
+
+      final response = await _client.get(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: headers,
+      );
+
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return ApiResponse(
+          success: true,
+          data: responseData,
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          errorMessage: responseData['error'] ?? 'Unknown error occurred',
+        );
+      }
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        errorMessage: 'Network error: ${e.toString()}',
+      );
+    }
+  }
+}
