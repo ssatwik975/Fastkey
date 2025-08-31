@@ -38,6 +38,7 @@ dependencies:
   intl: ^0.18.1
   webview_flutter: ^4.2.2
   device_info_plus: ^9.0.2
+  url_launcher: ^6.1.10
 
 dev_dependencies:
   flutter_test:

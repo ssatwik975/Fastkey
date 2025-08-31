@@ -8,11 +8,13 @@ class AuthResult {
   final bool success;
   final String? token;
   final String? errorMessage;
+  final bool needsRegistration; // New field
 
   AuthResult({
     required this.success,
     this.token,
     this.errorMessage,
+    this.needsRegistration = false, // Default to false
   });
 }
 
@@ -47,10 +49,19 @@ class AuthService {
           success: true,
         );
       } else {
-        return AuthResult(
-          success: false,
-          errorMessage: response.errorMessage ?? 'Failed to register device',
-        );
+        // Check if the error is "User not found"
+        if (response.errorMessage?.contains('User not found') == true) {
+          return AuthResult(
+            success: false,
+            needsRegistration: true, // Indicate registration is needed
+            errorMessage: 'User not found, registration required',
+          );
+        } else {
+          return AuthResult(
+            success: false,
+            errorMessage: response.errorMessage ?? 'Failed to register device',
+          );
+        }
       }
     } catch (e) {
       return AuthResult(

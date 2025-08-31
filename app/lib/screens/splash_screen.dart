@@ -15,29 +15,37 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    // Allow splash screen to be visible for a moment
-    Future.delayed(const Duration(seconds: 2), () {
-      _checkAuthStatus();
-    });
-  }
-
-  void _checkAuthStatus() {
-    // Add this line to prevent using context after widget is unmounted
-    if (!mounted) return;
     
+    // First check if auth provider has already initialized
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
-    if (authProvider.status == AuthStatus.authenticated) {
+    if (authProvider.status != AuthStatus.initial) {
+      // If already initialized, check status
+      _handleAuthStatus(authProvider.status);
+    } else {
+      // If still initializing, wait a moment and then check
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          final currentStatus = Provider.of<AuthProvider>(context, listen: false).status;
+          _handleAuthStatus(currentStatus);
+        }
+      });
+    }
+  }
+
+  // Add this method to handle navigation based on auth status
+  void _handleAuthStatus(AuthStatus status) {
+    if (!mounted) return;
+    
+    if (status == AuthStatus.authenticated) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const DashboardScreen()),
       );
-    } else if (authProvider.status == AuthStatus.unauthenticated ||
-               authProvider.status == AuthStatus.error) {
+    } else if (status == AuthStatus.unauthenticated || status == AuthStatus.error) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const LoginScreen()),
       );
     }
-    // If still initial, wait for status to change via provider
   }
 
   @override

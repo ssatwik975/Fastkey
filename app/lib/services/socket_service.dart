@@ -64,8 +64,8 @@ class SocketService {
 
   void _setupLoginRequestListener(String username, String deviceToken) {
     // Listen for login requests specific to this device
-    _socket?.on('login-request:$username:$deviceToken', (data) {
-      print('Received login request: $data');
+    _socket?.on('login-request:$username', (data) {
+      print('Received login request for username: $username');
       
       if (data != null && data['sessionId'] != null) {
         // Create and return login request object
@@ -79,6 +79,28 @@ class SocketService {
         );
         
         // Notify listeners
+        if (_onLoginRequestCallbacks.isNotEmpty) {
+          for (final callback in _onLoginRequestCallbacks) {
+            callback(loginRequest);
+          }
+        }
+      }
+    });
+    
+    // Also listen for device-specific requests as fallback
+    _socket?.on('login-request:$username:$deviceToken', (data) {
+      print('Received device-specific login request');
+      // Same processing as above
+      if (data != null && data['sessionId'] != null) {
+        final loginRequest = LoginRequest(
+          sessionId: data['sessionId'],
+          username: username,
+          timestamp: data['timestamp'] != null 
+              ? DateTime.parse(data['timestamp']) 
+              : DateTime.now(),
+          deviceInfo: data['deviceInfo'],
+        );
+        
         if (_onLoginRequestCallbacks.isNotEmpty) {
           for (final callback in _onLoginRequestCallbacks) {
             callback(loginRequest);

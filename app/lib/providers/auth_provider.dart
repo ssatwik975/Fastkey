@@ -17,6 +17,9 @@ class AuthProvider with ChangeNotifier {
   String? _token;
   String? _errorMessage;
 
+  // Add a new field
+  bool _needsRegistration = false;
+
   final AuthService _authService = AuthService();
   final StorageService _storageService = StorageService();
 
@@ -26,23 +29,35 @@ class AuthProvider with ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
 
+  // Add getter
+  bool get needsRegistration => _needsRegistration;
+
   AuthProvider() {
     _initialize();
   }
 
+  // Update the _initialize method to add more logging for debugging
+
   Future<void> _initialize() async {
     try {
+      print('Initializing auth provider...');
       final userData = await _storageService.getUserData();
       final storedToken = await _storageService.getToken();
+      
+      print('Retrieved user data: ${userData != null}');
+      print('Retrieved token: ${storedToken != null}');
       
       if (userData != null && storedToken != null) {
         _user = userData;
         _token = storedToken;
         _status = AuthStatus.authenticated;
+        print('Auth provider initialized with authenticated user: ${userData.username}');
       } else {
         _status = AuthStatus.unauthenticated;
+        print('Auth provider initialized but no user data found');
       }
     } catch (e) {
+      print('Error initializing auth provider: $e');
       _status = AuthStatus.unauthenticated;
     }
     notifyListeners();
@@ -52,6 +67,7 @@ class AuthProvider with ChangeNotifier {
     try {
       _status = AuthStatus.authenticating;
       _errorMessage = null;
+      _needsRegistration = false; // Reset this flag
       notifyListeners();
 
       final deviceToken = await _storageService.getDeviceToken();
@@ -72,6 +88,7 @@ class AuthProvider with ChangeNotifier {
         return true;
       } else {
         _errorMessage = result.errorMessage ?? 'Registration failed';
+        _needsRegistration = result.needsRegistration; // Set the flag
         _status = AuthStatus.error;
         notifyListeners();
         return false;

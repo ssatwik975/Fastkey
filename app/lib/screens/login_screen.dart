@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:fastkey/providers/auth_provider.dart';
 import 'package:fastkey/screens/dashboard_screen.dart';
 import 'package:fastkey/widgets/primary_button.dart';
+import 'package:fastkey/screens/webview_registration_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,9 +13,11 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _usernameController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  final _usernameController = TextEditingController();
   bool _isLoading = false;
+  String? _errorMessage;
+  bool _needsRegistration = false; // Add this flag
 
   @override
   void dispose() {
@@ -22,37 +25,51 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _handleRegister() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-    
-    setState(() {
-      _isLoading = true;
-    });
-
-    final username = _usernameController.text.trim();
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
-    final success = await authProvider.register(username);
-    
-    if (mounted) {
+  Future<void> _handleLogin() async {
+    if (_formKey.currentState!.validate()) {
       setState(() {
-        _isLoading = false;
+        _isLoading = true;
+        _errorMessage = null;
+        _needsRegistration = false; // Reset the flag
       });
       
-      if (success) {
+      final result = await Provider.of<AuthProvider>(context, listen: false)
+          .register(_usernameController.text.trim());
+      
+      if (!result) {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        setState(() {
+          _isLoading = false;
+          _errorMessage = authProvider.errorMessage;
+          _needsRegistration = authProvider.needsRegistration; // Set local flag
+        });
+        
+        // Don't automatically open WebView, let user click the button
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+        
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const DashboardScreen()),
         );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(authProvider.errorMessage ?? 'Registration failed'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
+    }
+  }
+
+  Future<void> _openRegistrationWebView() async {
+    final registrationSuccess = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => WebViewRegistrationScreen(
+          username: _usernameController.text.trim(),
+        ),
+      ),
+    );
+    
+    if (registrationSuccess == true) {
+      // Try login again after successful registration
+      _handleLogin();
     }
   }
 
@@ -90,10 +107,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 48),
                 TextFormField(
                   controller: _usernameController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Username',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.person),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -103,42 +122,43 @@ class _LoginScreenState extends State<LoginScreen> {
                   },
                 ),
                 const SizedBox(height: 24),
-                PrimaryButton(
-                  onPressed: _isLoading ? null : _handleRegister,
-                  text: 'Register Device',
-                  isLoading: _isLoading,
-                ),
-                const SizedBox(height: 16),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Text(
-                    'This will register your device for passwordless login. You will be able to approve login requests from this device.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 14,
+                if (_errorMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: Colors.red),
+                      textAlign: TextAlign.center,
                     ),
                   ),
+                PrimaryButton(
+                  text: 'Continue',
+                  isLoading: _isLoading,
+                  onPressed: _handleLogin,
                 ),
-                const Spacer(),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.shield,
-                      color: Colors.grey[700],
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Secured with FIDO2 Technology',
-                      style: TextStyle(
-                        color: Colors.grey[700],
-                        fontSize: 14,
+                
+                // Add Create Account button when registration is needed
+                if (_needsRegistration)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16.0),
+                    child: OutlinedButton(
+                      onPressed: _openRegistrationWebView,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: const BorderSide(color: Color(0xFF2563EB)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Create New Account',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Color(0xFF2563EB),
+                        ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
               ],
             ),
           ),
