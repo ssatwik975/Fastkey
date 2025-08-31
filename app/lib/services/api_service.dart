@@ -15,7 +15,7 @@ class ApiResponse {
 
 class ApiService {
   // In a production app, you'd use a config file or environment variables
-  static const String baseUrl = 'https://fastkey.onrender.com/api';
+  static const String baseUrl = 'https://fastkey.onrender.com';
   // For local development, use your local IP address instead of localhost
   // static const String baseUrl = 'http://192.168.1.x:5001/api';
 
