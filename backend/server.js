@@ -1192,4 +1192,8 @@ io.on('connection', (socket) => {
   // ...existing code...
 });
 
-// ...existing code...
+// PORT environment variable provided by Render
+const PORT = process.env.PORT || 5001;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
