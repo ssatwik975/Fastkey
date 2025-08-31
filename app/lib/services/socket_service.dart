@@ -13,6 +13,7 @@ class SocketService {
 
   Future<void> initialize() async {
     if (_socket != null) {
+      print('Socket already initialized, returning');
       return;
     }
 
@@ -21,17 +22,28 @@ class SocketService {
       final userData = await _storageService.getUserData();
       final deviceToken = await _storageService.getDeviceToken();
       
+      print('Initializing socket service with:');
+      print('User: ${userData?.username}');
+      print('Device token: $deviceToken');
+      
       if (userData == null || deviceToken == null) {
         print('Cannot initialize socket: missing user data or device token');
         return;
       }
 
-      // Initialize Socket.io client
+      // Initialize Socket.io client with additional options
       _socket = io.io(socketUrl, <String, dynamic>{
         'transports': ['websocket'],
         'autoConnect': true,
+        'reconnection': true,
+        'reconnectionAttempts': 5,
+        'reconnectionDelay': 1000,
       });
 
+      _socket!.onConnecting((_) => print('Socket connecting...'));
+      _socket!.onConnectError((err) => print('Socket connect error: $err'));
+      _socket!.onConnectTimeout((_) => print('Socket connect timeout'));
+      
       // Connect to socket
       _socket!.connect();
 

@@ -19,6 +19,7 @@ export default function Home() {
   const [isRegistration, setIsRegistration] = useState(false);
   const [authMode, setAuthMode] = useState('login');
   const [hasMobileDevices, setHasMobileDevices] = useState(false);
+  const [hasMobileApp, setHasMobileApp] = useState(false);
   const router = useRouter();
   
   const API_BASE_URL = getApiBaseUrl();
@@ -244,6 +245,15 @@ export default function Home() {
     }
   };
 
+  // Check if user has mobile devices
+  useEffect(() => {
+    // Only check when username is entered and verified
+    if (status === 'qr' && username) {
+      // Add a message about mobile app under the QR code
+      setHasMobileApp(true);
+    }
+  }, [status, username]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-slate-900 flex flex-col items-center justify-center p-6">
       {/* Brand header */}
@@ -436,6 +446,14 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
+
+                  {hasMobileApp && (
+                    <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <p className="text-sm text-blue-800">
+                        <span className="font-semibold">Have the FastKey mobile app?</span> Check your app notifications for a login request instead of scanning the QR code.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 

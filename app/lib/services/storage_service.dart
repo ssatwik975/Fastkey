@@ -27,12 +27,23 @@ class StorageService {
   // Save user data to secure storage
   Future<void> saveUserData(User user) async {
     try {
+      final userJson = jsonEncode(user.toJson());
+      print('Saving user data: ${user.username}');
       await _secureStorage.write(
         key: _userKey,
-        value: jsonEncode(user.toJson()),
+        value: userJson,
       );
+      print('User data saved successfully');
     } catch (e) {
       print('Error saving user data: $e');
+      // Try fallback to shared preferences if secure storage fails
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_userKey, jsonEncode(user.toJson()));
+        print('User data saved to shared preferences as fallback');
+      } catch (e2) {
+        print('Fatal error, could not save user data to any storage: $e2');
+      }
     }
   }
 

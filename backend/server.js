@@ -314,6 +314,24 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Register mobile device for push notifications
+  socket.on('register-mobile-listener', async (data) => {
+    const { username, deviceToken } = data;
+    console.log(`Mobile device registered for ${username} with token ${deviceToken}`);
+    
+    // Store socket ID mapped to username and device token
+    socket.join(`mobile:${username}`);
+    socket.join(`device:${deviceToken}`);
+    
+    // Store association
+    socket.data.username = username;
+    socket.data.deviceToken = deviceToken;
+    socket.data.isMobileDevice = true;
+    
+    // Acknowledge registration
+    socket.emit('mobile-registered', { success: true });
+  });
+  
   // Update the socket handler to include registration flag and socket ID
   socket.on('requestQR', async ({ username, isRegistration }) => {
     try {
@@ -338,6 +356,16 @@ io.on('connection', (socket) => {
         timestamp: Date.now(),
         isRegistration 
       });
+      
+      // Notify all mobile devices for this user
+      io.to(`mobile:${username}`).emit('login-request:' + username, {
+        sessionId,
+        username,
+        timestamp: new Date().toISOString(),
+        deviceInfo: socket.handshake.headers['user-agent'] || 'Unknown device'
+      });
+      
+      console.log(`Emitted login-request:${username} to mobile devices`);
       
       // Send QR data back to client
       socket.emit('qrGenerated', { url, sessionId, isRegistration });
