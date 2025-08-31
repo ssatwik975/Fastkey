@@ -8,7 +8,8 @@ enum AuthStatus {
   unauthenticated,
   authenticating,
   authenticated,
-  error
+  error,
+  loading
 }
 
 class AuthProvider with ChangeNotifier {
@@ -41,6 +42,9 @@ class AuthProvider with ChangeNotifier {
   Future<void> _initialize() async {
     try {
       print('Initializing auth provider...');
+      _status = AuthStatus.loading;
+      notifyListeners();
+      
       final userData = await _storageService.getUserData();
       final storedToken = await _storageService.getToken();
       
@@ -58,7 +62,7 @@ class AuthProvider with ChangeNotifier {
       }
     } catch (e) {
       print('Error initializing auth provider: $e');
-      _status = AuthStatus.unauthenticated;
+      _status = AuthStatus.error;
     }
     notifyListeners();
   }

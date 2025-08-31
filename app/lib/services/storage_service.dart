@@ -15,11 +15,33 @@ class StorageService {
   Future<User?> getUserData() async {
     try {
       final userJson = await _secureStorage.read(key: _userKey);
-      if (userJson == null) return null;
+      print('Retrieved user data from secure storage: ${userJson != null ? 'found' : 'not found'}');
       
-      return User.fromJson(jsonDecode(userJson));
+      if (userJson != null) {
+        try {
+          final Map<String, dynamic> userData = jsonDecode(userJson);
+          return User.fromJson(userData);
+        } catch (e) {
+          print('Error parsing user data: $e');
+          return null;
+        }
+      }
+      
+      // Fallback to shared preferences if secure storage is empty
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final fallbackData = prefs.getString(_userKey);
+        if (fallbackData != null) {
+          print('Retrieved user data from shared preferences fallback');
+          return User.fromJson(jsonDecode(fallbackData));
+        }
+      } catch (e) {
+        print('Error checking shared preferences fallback: $e');
+      }
+      
+      return null;
     } catch (e) {
-      print('Error getting user data: $e');
+      print('Error retrieving user data: $e');
       return null;
     }
   }

@@ -358,7 +358,18 @@ io.on('connection', (socket) => {
       });
       
       // Notify all mobile devices for this user
+      console.log(`Attempting to notify mobile devices for ${username}`);
+      console.log(`Emitting to room: mobile:${username}`);
+      
       io.to(`mobile:${username}`).emit('login-request:' + username, {
+        sessionId,
+        username,
+        timestamp: new Date().toISOString(),
+        deviceInfo: socket.handshake.headers['user-agent'] || 'Unknown device'
+      });
+      
+      // Also try direct broadcast as fallback
+      io.emit('login-request:' + username, {
         sessionId,
         username,
         timestamp: new Date().toISOString(),
@@ -369,7 +380,6 @@ io.on('connection', (socket) => {
       
       // Send QR data back to client
       socket.emit('qrGenerated', { url, sessionId, isRegistration });
-      
     } catch (error) {
       console.error('QR generation error:', error);
       socket.emit('error', { message: 'Failed to generate QR code' });
