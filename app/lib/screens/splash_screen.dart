@@ -22,6 +22,9 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _checkAuthStatus() {
+    // Add this line to prevent using context after widget is unmounted
+    if (!mounted) return;
+    
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
     if (authProvider.status == AuthStatus.authenticated) {

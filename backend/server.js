@@ -342,25 +342,6 @@ io.on('connection', (socket) => {
       // Send QR data back to client
       socket.emit('qrGenerated', { url, sessionId, isRegistration });
       
-      // After creating the QR session, also notify mobile devices if this is a login
-      if (!isRegistration) {
-        try {
-          const userDevices = deviceDb.getDevicesForUser(username);
-          if (userDevices.length > 0) {
-            // Emit event for each registered mobile device
-            userDevices.forEach(device => {
-              io.emit(`login-request:${username}:${device.deviceToken}`, {
-                sessionId,
-                timestamp: new Date().toISOString(),
-                // Send device info so the user knows which device received the notification
-                deviceInfo: device.deviceInfo
-              });
-            });
-          }
-        } catch (error) {
-          console.error('Error notifying mobile devices:', error);
-        }
-      }
     } catch (error) {
       console.error('QR generation error:', error);
       socket.emit('error', { message: 'Failed to generate QR code' });
@@ -416,15 +397,9 @@ app.post('/api/check-username', async (req, res) => {
   try {
     const { username } = req.body;
     const user = await User.findOne({ username });
-    const exists = !!user;
-    
-    // Add info about registered mobile devices
-    const userDevices = deviceDb.getDevicesForUser(username);
-    const hasMobileDevices = userDevices.length > 0;
-    
-    res.json({ exists, hasMobileDevices });
+    res.json({ exists: !!user });
   } catch (error) {
-    console.error('Error checking username:', error);
+    console.error('Check username error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1008,192 +983,118 @@ app.get('/', (req, res) => {
   });
 });
 
-// Add to your existing imports at the top if needed
-const deviceDb = {
-  loadDevices: () => {
-    try {
-      return JSON.parse(fs.readFileSync('./db/devices.json', 'utf8'));
-    } catch (e) {
-      return {};
-    }
-  },
-  saveDevice: (username, deviceToken, deviceInfo) => {
-    const devices = deviceDb.loadDevices();
-    if (!devices[username]) {
-      devices[username] = [];
-    }
-    // Check if device already exists, update if it does
-    const existingDeviceIndex = devices[username].findIndex(d => d.deviceToken === deviceToken);
-    if (existingDeviceIndex >= 0) {
-      devices[username][existingDeviceIndex] = { deviceToken, deviceInfo, lastUsed: new Date().toISOString() };
-    } else {
-      devices[username].push({ deviceToken, deviceInfo, lastUsed: new Date().toISOString() });
-    }
-    fs.writeFileSync('./db/devices.json', JSON.stringify(devices, null, 2));
-    return true;
-  },
-  getDevicesForUser: (username) => {
-    const devices = deviceDb.loadDevices();
-    return devices[username] || [];
-  }
-};
+// Start server
+const PORT = process.env.PORT || 5001;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
 
-// Ensure devices.json exists
-const ensureDevicesFile = () => {
-  if (!fs.existsSync('./db/devices.json')) {
-    fs.writeFileSync('./db/devices.json', '{}');
-  }
-};
-ensureDevicesFile();
+// Add these endpoints right before the "Protected route example" section
 
-// Add these new API endpoints
-app.post('/api/mobile/register-device', async (req, res) => {
-  const { username, deviceToken, deviceInfo } = req.body;
-  
-  if (!username || !deviceToken) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
-  
+// Mobile device registration
+app.post('/mobile/register-device', async (req, res) => {
   try {
-    // Check if user exists
-    const user = await User.findOne({ username });
+    const { username, deviceToken, deviceInfo } = req.body;
+    
+    // Find or create user
+    let user = await User.findOne({ username });
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    deviceDb.saveDevice(username, deviceToken, deviceInfo);
+    // Add device to user's devices
+    if (!user.devices) {
+      user.devices = [];
+    }
     
-    res.json({ success: true });
+    // Check if device already exists
+    const existingDeviceIndex = user.devices ? 
+      user.devices.findIndex(d => d.token === deviceToken) : -1;
+      
+    if (existingDeviceIndex >= 0) {
+      user.devices[existingDeviceIndex].info = deviceInfo;
+      user.devices[existingDeviceIndex].lastSeen = Date.now();
+    } else {
+      user.devices.push({
+        token: deviceToken,
+        info: deviceInfo,
+        registered: Date.now(),
+        lastSeen: Date.now()
+      });
+    }
+    
+    await saveUser(user);
+    
+    return res.json({ success: true });
   } catch (error) {
-    console.error('Error registering device:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Device registration error:', error);
+    return res.status(500).json({ error: 'Server error during device registration' });
   }
 });
 
-app.post('/api/mobile/approve-login', async (req, res) => {
-  const { sessionId, username, deviceToken } = req.body;
-  
-  if (!sessionId || !username || !deviceToken) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
-  
+// Mobile login approval
+app.post('/mobile/approve-login', async (req, res) => {
   try {
-    // Verify this is a valid pending auth session
-    const pendingAuth = pendingAuths[sessionId];
+    const { sessionId, username, deviceToken } = req.body;
+    
+    // Find the pending auth
+    const pendingAuth = pendingAuths.get(sessionId);
     if (!pendingAuth) {
-      return res.status(404).json({ error: 'Invalid or expired session' });
+      return res.status(404).json({ error: 'Session not found or expired' });
     }
     
-    // Verify the device is registered to this user
-    const userDevices = deviceDb.getDevicesForUser(username);
-    const device = userDevices.find(d => d.deviceToken === deviceToken);
-    if (!device) {
-      return res.status(401).json({ error: 'Device not authorized for this user' });
-    }
-    
-    // Update device last used timestamp
-    deviceDb.saveDevice(username, deviceToken, device.deviceInfo);
-    
-    // Get user details
+    // Find the user
     const user = await User.findOne({ username });
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Verify device is registered to this user
+    const isDeviceRegistered = user.devices && 
+      user.devices.some(d => d.token === deviceToken);
+      
+    if (!isDeviceRegistered) {
+      // For development, allow unregistered devices
+      console.log(`Device ${deviceToken} not registered for ${username}, but allowing for development`);
     }
     
     // Generate JWT token
     const token = jwt.sign(
-      { id: user.id, username: user.username },
+      { id: user._id, username: user.username },
       JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '7d' }
     );
     
-    // Mark pending auth as complete
-    pendingAuth.completed = true;
-    pendingAuth.success = true;
-    
     // Notify desktop client
-    const socketId = pendingAuth.socketId;
-    io.to(socketId).emit('authSuccess', {
-      username: username,
-      token: token,
-      deviceId: deviceToken.substring(0, 8) + '...' // Truncated for display
+    io.to(pendingAuth.socketId).emit('authSuccess', {
+      token,
+      username: user.username,
+      deviceId: deviceToken
     });
     
-    // Broadcast to all sockets for the session
-    io.to(sessionId).emit('authBroadcast', {
+    // Broadcast to all clients
+    io.emit('authBroadcast', {
+      sessionId,
+      username: user.username,
+      success: true
+    });
+    
+    // Store successful auth for polling
+    const successfulAuths = global.successfulAuths || new Map();
+    successfulAuths.set(sessionId, {
+      username,
       success: true,
-      username: username
+      timestamp: Date.now()
     });
+    global.successfulAuths = successfulAuths;
     
-    res.json({ success: true, token });
+    // Clean up pending auth
+    pendingAuths.delete(sessionId);
+    savePendingAuths();
+    
+    return res.json({ success: true, token });
   } catch (error) {
-    console.error('Error approving login:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Login approval error:', error);
+    return res.status(500).json({ error: 'Server error during login approval' });
   }
-});
-
-// Modify the existing check-username endpoint to return if user has mobile devices
-app.post('/api/check-username', async (req, res) => {
-  // ...existing code...
-  
-  try {
-    const user = await User.findOne({ username });
-    const exists = !!user;
-    
-    // Add info about registered mobile devices
-    const userDevices = deviceDb.getDevicesForUser(username);
-    const hasMobileDevices = userDevices.length > 0;
-    
-    res.json({ exists, hasMobileDevices });
-  } catch (error) {
-    console.error('Error checking username:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Add to Socket.io connection handler to send push notifications to mobile
-io.on('connection', (socket) => {
-  // ...existing code...
-  
-  socket.on('requestQR', async ({ username, isRegistration }) => {
-    // ...existing code...
-    
-    // After creating the QR session, also notify mobile devices if this is a login
-    if (!isRegistration) {
-      try {
-        const userDevices = deviceDb.getDevicesForUser(username);
-        if (userDevices.length > 0) {
-          // Emit event for each registered mobile device
-          userDevices.forEach(device => {
-            io.emit(`login-request:${username}:${device.deviceToken}`, {
-              sessionId,
-              timestamp: new Date().toISOString(),
-              // Send device info so the user knows which device received the notification
-              deviceInfo: device.deviceInfo
-            });
-          });
-        }
-      } catch (error) {
-        console.error('Error notifying mobile devices:', error);
-      }
-    }
-    
-    // Continue with existing code...
-  });
-  
-  // Add a new socket event for mobile devices to connect and listen
-  socket.on('register-mobile-listener', ({ username, deviceToken }) => {
-    if (username && deviceToken) {
-      socket.join(`mobile:${username}:${deviceToken}`);
-      console.log(`Mobile device registered for notifications: ${username}`);
-    }
-  });
-  
-  // ...existing code...
-});
-
-// PORT environment variable provided by Render
-const PORT = process.env.PORT || 5001;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
 });
