@@ -1,10 +1,14 @@
-import 'package:socket_io_client/socket_io_client.dart' as io;
+import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:fastkey/models/login_request.dart';
 import 'package:fastkey/services/storage_service.dart';
+import 'package:fastkey/services/notification_service.dart';
 
 class SocketService {
-  io.Socket? _socket;
+  IO.Socket? _socket;
+  final _storage = const FlutterSecureStorage();
   final StorageService _storageService = StorageService();
+  final NotificationService _notificationService = NotificationService();
 
   // Socket.io server URL - same as backend
   static const String socketUrl = 'https://fastkey.onrender.com';
@@ -32,7 +36,7 @@ class SocketService {
       }
 
       // Initialize Socket.io client with additional options
-      _socket = io.io(socketUrl, <String, dynamic>{
+      _socket = IO.io(socketUrl, <String, dynamic>{
         'transports': ['websocket'],
         'autoConnect': true,
         'reconnection': true,
@@ -40,9 +44,33 @@ class SocketService {
         'reconnectionDelay': 1000,
       });
 
-      _socket!.onConnecting((_) => print('Socket connecting...'));
-      _socket!.onConnectError((err) => print('Socket connect error: $err'));
-      _socket!.onConnectTimeout((_) => print('Socket connect timeout'));
+      // Updated socket event handlers for v3.x
+      _socket!.onConnect((_) {
+        print('Socket connected');
+        
+        // Register for mobile-specific events
+        _socket!.emit('register-mobile-listener', {
+          'username': userData.username,
+          'deviceToken': deviceToken,
+        });
+      });
+
+      _socket!.onDisconnect((_) {
+        print('Socket disconnected');
+      });
+
+      _socket!.onConnectError((data) {
+        print('Socket connect error: $data');
+      });
+
+      // These methods remain the same
+      _socket!.on('login_request', (data) {
+        // Your login request handler
+      });
+
+      _socket!.on('auth_approved', (data) {
+        // Your auth approved handler
+      });
       
       // Connect to socket
       _socket!.connect();
@@ -75,18 +103,28 @@ class SocketService {
   }
 
   void _setupLoginRequestListener(String username, String deviceToken) {
+    // Initialize notification service
+    _notificationService.initialize();
+    
     // Listen for login requests specific to this device
     _socket?.on('login-request:$username', (data) {
       print('Received login request for username: $username');
       
       if (data != null && data['sessionId'] != null) {
-        // Create and return login request object
+        // Create login request object
         final loginRequest = LoginRequest(
           sessionId: data['sessionId'],
           username: username,
           timestamp: data['timestamp'] != null 
               ? DateTime.parse(data['timestamp']) 
               : DateTime.now(),
+          deviceInfo: data['deviceInfo'],
+        );
+        
+        // Show notification
+        _notificationService.showLoginRequestNotification(
+          username: username,
+          sessionId: data['sessionId'],
           deviceInfo: data['deviceInfo'],
         );
         
@@ -102,7 +140,6 @@ class SocketService {
     // Also listen for device-specific requests as fallback
     _socket?.on('login-request:$username:$deviceToken', (data) {
       print('Received device-specific login request');
-      // Same processing as above
       if (data != null && data['sessionId'] != null) {
         final loginRequest = LoginRequest(
           sessionId: data['sessionId'],
@@ -110,6 +147,13 @@ class SocketService {
           timestamp: data['timestamp'] != null 
               ? DateTime.parse(data['timestamp']) 
               : DateTime.now(),
+          deviceInfo: data['deviceInfo'],
+        );
+        
+        // Show notification
+        _notificationService.showLoginRequestNotification(
+          username: username,
+          sessionId: data['sessionId'],
           deviceInfo: data['deviceInfo'],
         );
         

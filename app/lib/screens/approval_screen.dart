@@ -36,7 +36,9 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.of(context).pop();
+        
+        // Navigate back to dashboard immediately
+        Navigator.of(context).popUntil((route) => route.isFirst);
       } else {
         setState(() {
           _isProcessing = false;

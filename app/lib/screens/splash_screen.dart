@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fastkey/providers/auth_provider.dart';
-import 'package:fastkey/screens/login_screen.dart';
+import 'package:fastkey/screens/onboarding_screen.dart';
 import 'package:fastkey/screens/dashboard_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -11,90 +11,147 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen> 
+    with TickerProviderStateMixin {
+  late AnimationController _logoController;
+  late AnimationController _fadeController;
+  late Animation<double> _logoAnimation;
+  late Animation<double> _fadeAnimation;
+
   @override
   void initState() {
     super.initState();
     
-    // First check if auth provider has already initialized
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    _logoController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
     
-    if (authProvider.status != AuthStatus.initial) {
-      // If already initialized, check status
-      _handleAuthStatus(authProvider.status);
-    } else {
-      // If still initializing, wait a moment and then check
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          final currentStatus = Provider.of<AuthProvider>(context, listen: false).status;
-          _handleAuthStatus(currentStatus);
-        }
-      });
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    
+    _logoAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _logoController,
+      curve: Curves.easeOutBack,
+    ));
+    
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOut,
+    ));
+    
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    // Start animations
+    _logoController.forward();
+    await Future.delayed(const Duration(milliseconds: 300));
+    _fadeController.forward();
+    
+    // Wait for animations to complete and auto-initialize auth provider
+    await Future.delayed(const Duration(milliseconds: 2000));
+    
+    if (mounted) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      Navigator.pushReplacement(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) {
+            return authProvider.isAuthenticated 
+                ? const DashboardScreen()
+                : const OnboardingScreen();
+          },
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 500),
+        ),
+      );
     }
   }
 
-  // Add this method to handle navigation based on auth status
-  void _handleAuthStatus(AuthStatus status) {
-    if (!mounted) return;
-    
-    if (status == AuthStatus.authenticated) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const DashboardScreen()),
-      );
-    } else if (status == AuthStatus.unauthenticated || status == AuthStatus.error) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-      );
-    }
+  @override
+  void dispose() {
+    _logoController.dispose();
+    _fadeController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Consumer<AuthProvider>(
-        builder: (context, authProvider, _) {
-          // If status changed after initial check
-          if (authProvider.status == AuthStatus.authenticated) {
-            Future.microtask(() {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (context) => const DashboardScreen()),
-              );
-            });
-          } else if (authProvider.status == AuthStatus.unauthenticated ||
-                     authProvider.status == AuthStatus.error) {
-            Future.microtask(() {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-              );
-            });
-          }
-          
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  'FastKey',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2563EB),
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Animated logo
+            ScaleTransition(
+              scale: _logoAnimation,
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF007AFF),
+                      Color(0xFF5856D6),
+                    ],
                   ),
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF007AFF).withOpacity(0.3),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 24),
-                const CircularProgressIndicator(),
-                const SizedBox(height: 16),
-                Text(
-                  'Passwordless Authentication',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                  ),
+                child: const Icon(
+                  Icons.fingerprint_rounded,
+                  size: 64,
+                  color: Colors.white,
                 ),
-              ],
+              ),
             ),
-          );
-        },
+            
+            const SizedBox(height: 32),
+            
+            // App name and tagline
+            FadeTransition(
+              opacity: _fadeAnimation,
+              child: Column(
+                children: [
+                  Text(
+                    'FastKey',
+                    style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                      color: const Color(0xFF1C1C1E),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Secure. Simple. Swift.',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: const Color(0xFF8E8E93),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

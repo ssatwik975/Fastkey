@@ -434,8 +434,24 @@ io.on('connection', (socket) => {
 app.post('/api/check-username', async (req, res) => {
   try {
     const { username } = req.body;
+    
+    if (!username) {
+      return res.status(400).json({ error: 'Username is required' });
+    }
+    
     const user = await User.findOne({ username });
-    res.json({ exists: !!user });
+    const exists = !!user;
+    
+    // Also check if this user has any mobile devices registered
+    const hasMobileDevices = exists && user.devices && user.devices.length > 0;
+    
+    console.log(`Username check: ${username} - exists: ${exists}, has mobile devices: ${hasMobileDevices}`);
+    
+    res.json({ 
+      exists,
+      hasMobileDevices,
+      username 
+    });
   } catch (error) {
     console.error('Check username error:', error);
     res.status(500).json({ error: 'Server error' });
