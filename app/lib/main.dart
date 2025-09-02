@@ -10,6 +10,17 @@ import 'package:fastkey/services/socket_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Set system UI overlay style for pure white status bar
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent, // Make it transparent, not white
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+      systemNavigationBarColor: Colors.white,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
+  
   runApp(const FastKeyApp());
 }
 
@@ -18,17 +29,6 @@ class FastKeyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Set system UI overlay style for modern look
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-        systemNavigationBarColor: Colors.white,
-        systemNavigationBarIconBrightness: Brightness.dark,
-      ),
-    );
-
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => AuthProvider()),
@@ -46,23 +46,23 @@ class FastKeyApp extends StatelessWidget {
   ThemeData _buildTheme() {
     return ThemeData(
       useMaterial3: true,
-      fontFamily: 'SF Pro Display', // iOS-style font
+      fontFamily: 'SF Pro Display',
       colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF2563EB), // Primary blue
+        seedColor: const Color(0xFF2563EB),
         brightness: Brightness.light,
       ).copyWith(
         primary: const Color(0xFF2563EB),
         secondary: const Color(0xFF7C3AED),
         tertiary: const Color(0xFF30D158),
         surface: Colors.white,
-        background: const Color(0xFFF2F2F7),
+        background: const Color(0xFFF8FAFC), // Changed to match dashboard
         error: const Color(0xFFFF3B30),
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onSurface: const Color(0xFF1C1C1E),
         onBackground: const Color(0xFF1C1C1E),
       ),
-      scaffoldBackgroundColor: Colors.white,
+      scaffoldBackgroundColor: const Color(0xFFF8FAFC), // Ensure consistent background
       appBarTheme: const AppBarTheme(
         elevation: 0,
         scrolledUnderElevation: 0,

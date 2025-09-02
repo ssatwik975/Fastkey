@@ -39,9 +39,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       approvalProvider.addLoginRequest(loginRequest);
     });
     
-    // Refresh login history after callback is set
-    authProvider.fetchLoginHistory();
-    
     // Debug message to check if provider is working
     print('Approval provider has ${approvalProvider.pendingRequests.length} pending requests');
     
@@ -59,6 +56,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           sessionId: sessionId,
           username: username,
           timestamp: DateTime.now(),
+          deviceInfo: 'Notification tap',
         );
         
         // Add a slight delay to ensure the screen is fully loaded
@@ -77,15 +75,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('Dashboard'),
+        automaticallyImplyLeading: false, // This removes the back arrow
+        title: const Text(
+          'Dashboard',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1E293B),
+          ),
+        ),
         elevation: 0,
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF8FAFC),
         actions: [
           IconButton(
             onPressed: () => _showLogoutDialog(context),
-            icon: const Icon(Icons.logout_rounded),
+            icon: const Icon(
+              Icons.logout_rounded,
+              color: Color(0xFF64748B),
+            ),
             tooltip: 'Sign Out',
           ),
         ],
@@ -100,78 +108,125 @@ class _DashboardScreenState extends State<DashboardScreen> {
             );
           }
           
-          return RefreshIndicator(
-            onRefresh: () => authProvider.fetchLoginHistory(),
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                // Greeting card
-                Card(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+          return ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              // Welcome message
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF3B82F6),
+                      Color(0xFF8B5CF6),
+                    ],
                   ),
-                  elevation: 0,
-                  color: const Color(0xFF2563EB),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.waving_hand_rounded,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF3B82F6).withOpacity(0.25),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(
+                        Icons.waving_hand,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Welcome back!',
+                            style: TextStyle(
                               color: Colors.white,
-                              size: 24,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Welcome, ${user.username}!',
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Your account is secured with biometric authentication.',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.white,
-                            height: 1.4,
                           ),
-                        ),
-                        const SizedBox(height: 16),
+                          const SizedBox(height: 6),
+                          Text(
+                            user.username,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 32),
+              
+              // Login Requests Section
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(16),
+                            color: const Color(0xFFF3F4F6),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                          child: const Icon(
+                            Icons.security_rounded,
+                            color: Color(0xFF3B82F6),
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF30D158),
-                                  shape: BoxShape.circle,
+                              Text(
+                                'Login Requests',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1E293B),
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                              const Text(
-                                'Active',
+                              SizedBox(height: 4),
+                              Text(
+                                'Approve or deny login attempts',
                                 style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 12,
+                                  fontSize: 14,
+                                  color: Color(0xFF64748B),
                                 ),
                               ),
                             ],
@@ -179,240 +234,295 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ],
                     ),
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // Pending requests
-                Consumer<ApprovalProvider>(
-                  builder: (context, approvalProvider, _) {
-                    if (approvalProvider.hasPendingRequests) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Pending Approvals',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          ...approvalProvider.pendingRequests.map((request) {
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              color: const Color(0xFFFFF9C4),
-                              child: ListTile(
-                                leading: const CircleAvatar(
-                                  backgroundColor: Color(0xFFFFB300),
-                                  child: Icon(
-                                    Icons.warning_amber_rounded,
-                                    color: Colors.white,
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Pending requests or empty state
+                    Consumer<ApprovalProvider>(
+                      builder: (context, approvalProvider, _) {
+                        if (approvalProvider.pendingRequests.isNotEmpty) {
+                          return Column(
+                            children: approvalProvider.pendingRequests.map((request) {
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 16),
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      const Color(0xFFFEF3C7),
+                                      const Color(0xFFFDE68A).withOpacity(0.8),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: const Color(0xFFF59E0B).withOpacity(0.2),
+                                    width: 1.5,
                                   ),
                                 ),
-                                title: Text(
-                                  'Login request from ${request.deviceInfo ?? 'unknown device'}',
-                                ),
-                                subtitle: Text(
-                                  DateFormat('MMM d, h:mm a').format(request.timestamp),
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.cancel_outlined,
-                                        color: Colors.red,
-                                      ),
-                                      onPressed: () {
-                                        approvalProvider.denyLogin(request);
-                                      },
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF59E0B).withOpacity(0.15),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(
+                                            Icons.login_rounded,
+                                            color: Color(0xFFD97706),
+                                            size: 20,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              const Text(
+                                                'New Login Request',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 16,
+                                                  color: Color(0xFF92400E),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                'From: ${request.deviceInfo ?? "Unknown device"}',
+                                                style: const TextStyle(
+                                                  color: Color(0xFFA16207),
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                              Text(
+                                                DateFormat('MMM d, h:mm a').format(request.timestamp),
+                                                style: const TextStyle(
+                                                  color: Color(0xFFA16207),
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.check_circle_outline,
-                                        color: Colors.green,
-                                      ),
-                                      onPressed: () {
-                                        approvalProvider.approveLogin(request);
-                                      },
+                                    const SizedBox(height: 16),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: ElevatedButton.icon(
+                                            onPressed: () {
+                                              approvalProvider.denyLogin(request);
+                                            },
+                                            icon: const Icon(Icons.close_rounded, size: 18),
+                                            label: const Text('Deny'),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.white,
+                                              foregroundColor: const Color(0xFFDC2626),
+                                              elevation: 0,
+                                              padding: const EdgeInsets.symmetric(vertical: 14),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                                side: const BorderSide(
+                                                  color: Color(0xFFDC2626),
+                                                  width: 1.5,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: ElevatedButton.icon(
+                                            onPressed: () {
+                                              approvalProvider.approveLogin(request);
+                                            },
+                                            icon: const Icon(Icons.check_rounded, size: 18),
+                                            label: const Text('Approve'),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF059669),
+                                              foregroundColor: Colors.white,
+                                              elevation: 0,
+                                              padding: const EdgeInsets.symmetric(vertical: 14),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
+                              );
+                            }).toList(),
+                          );
+                        }
+                        
+                        // Empty state
+                        return Container(
+                          padding: const EdgeInsets.all(32),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color(0xFFE2E8F0),
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF3B82F6).withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.shield_outlined,
+                                  size: 32,
+                                  color: Color(0xFF3B82F6),
+                                ),
                               ),
-                            );
-                          }).toList(),
-                          const SizedBox(height: 16),
-                        ],
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
-                ),
-                
-                // Login history
-                const Text(
-                  'Login History',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                
-                const SizedBox(height: 12),
-                
-                if (authProvider.isLoadingHistory)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24.0),
-                      child: CircularProgressIndicator(),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'No pending requests',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'When someone tries to log into your account from another device, you\'ll see the request here.',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                  height: 1.5,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
-                  )
-                else if (authProvider.loginHistory.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF2F2F7),
-                      borderRadius: BorderRadius.circular(12),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Security info
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
                     ),
-                    child: Column(
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Icon(
-                          Icons.history_rounded,
-                          size: 48,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No login history yet',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.grey[600],
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0FDF4),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.verified_user_rounded,
+                            color: Color(0xFF059669),
+                            size: 24,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Your recent login activity will appear here',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Your Security',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 18,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Protected by biometric authentication',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
                           ),
-                          textAlign: TextAlign.center,
                         ),
                       ],
                     ),
-                  )
-                else
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: authProvider.loginHistory.length,
-                    separatorBuilder: (context, index) => const Divider(),
-                    itemBuilder: (context, index) {
-                      final history = authProvider.loginHistory[index];
-                      return _buildLoginHistoryItem(history);
-                    },
-                  ),
-                
-                const SizedBox(height: 24),
-                
-                // Security info
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF2F2F7),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.security_rounded,
-                          color: Color(0xFF30D158),
-                          size: 24,
-                        ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      const SizedBox(width: 16),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Your Security',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline_rounded,
+                                color: Color(0xFF3B82F6),
+                                size: 20,
                               ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Your biometric data never leaves your device. FastKey uses FIDO2 standards to ensure security and privacy.',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF8E8E93),
+                              SizedBox(width: 8),
+                              Text(
+                                'Privacy First',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color: Color(0xFF1E293B),
+                                ),
                               ),
+                            ],
+                          ),
+                          SizedBox(height: 12),
+                          Text(
+                            'Your biometric data never leaves your device. FastKey uses FIDO2 standards to ensure security and privacy.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF64748B),
+                              height: 1.5,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           );
         },
       ),
-    );
-  }
-  
-  Widget _buildLoginHistoryItem(LoginHistory history) {
-    final date = DateFormat('MMM d, yyyy').format(history.timestamp);
-    final time = DateFormat('h:mm a').format(history.timestamp);
-    
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: history.successful 
-            ? const Color(0xFF30D158) 
-            : const Color(0xFFFF3B30),
-        child: Icon(
-          history.successful ? Icons.check : Icons.close,
-          color: Colors.white,
-        ),
-      ),
-      title: Text(
-        history.successful ? 'Successful login' : 'Failed login attempt',
-        style: const TextStyle(fontWeight: FontWeight.w500),
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 4),
-          Text('Date: $date at $time'),
-          if (history.deviceInfo != null)
-            Text('Device: ${history.deviceInfo}'),
-          if (history.location != null)
-            Text('Location: ${history.location}'),
-        ],
-      ),
-      isThreeLine: true,
     );
   }
 
@@ -420,12 +530,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Sign Out'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Sign Out',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         content: const Text('Are you sure you want to sign out?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                color: Color(0xFF64748B),
+              ),
+            ),
           ),
           TextButton(
             onPressed: () {
@@ -438,9 +561,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               );
             },
             style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
+              foregroundColor: const Color(0xFFDC2626),
             ),
-            child: const Text('Sign Out'),
+            child: const Text(
+              'Sign Out',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
