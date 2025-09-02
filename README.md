@@ -1,179 +1,141 @@
-# 🔐 FastKey - Secure Biometric Authentication System
+# FastKey – Biometric Authentication System
 
-<div align="center">
-  <img src="FASTkey.png" alt="FastKey Logo" width="200" height="200">
-  
-  <p><strong>Experience the future of passwordless authentication with FastKey - a cutting-edge biometric authentication system built with Flutter, Node.js, and Next.js.</strong></p>
+<p align="center">
+  <img src="FASTkey.png" alt="FastKey Logo" width="1060">
+</p>
 
-  [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
-  [![Flutter](https://img.shields.io/badge/Flutter-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
-  [![Node.js](https://img.shields.io/badge/Node.js-43853D?logo=node.js&logoColor=white)](https://nodejs.org)
-  [![Next.js](https://img.shields.io/badge/Next.js-000000?logo=next.js&logoColor=white)](https://nextjs.org)
-  [![FIDO2](https://img.shields.io/badge/FIDO2-WebAuthn-blue)](https://fidoalliance.org/)
+**FastKey** is a cross-platform, passwordless authentication system built on **FIDO2/WebAuthn** standards.
+It provides biometric authentication (fingerprint, Face ID, hardware keys) with end-to-end encryption, while ensuring biometric data never leaves the device.
 
-</div>
+---
 
-[Research Paper](./publication.md)
+## Why FastKey?
 
-## ✨ Features
+* **Standards-First** – Built on FIDO2/WebAuthn (no vendor lock-in, enterprise-ready).
+* **Device-Centric Security** – Zero-knowledge design; biometric templates never transmitted or stored centrally.
+* **Cross-Platform** – Flutter for iOS/Android, Next.js for web, Node.js backend.
+* **Offline Capability** – Authentication works even without a live internet connection.
+* **Operationally Practical** – Docker support, structured logging, production-ready APIs.
 
-### 🛡️ **Military-Grade Security**
-- **FIDO2/WebAuthn Standard**: Industry-leading passwordless authentication
-- **Biometric Protection**: Fingerprint, Face ID, and hardware security keys
-- **Zero-Knowledge Architecture**: Your biometric data never leaves your device
-- **End-to-End Encryption**: All communications are encrypted and secure
+---
 
-### 📱 **Cross-Platform Excellence**
-- **Mobile App**: Beautiful Flutter app for iOS and Android
-- **Web Dashboard**: Modern Next.js web interface
-- **Real-time Sync**: Instant authentication across all devices
-- **Offline Capable**: Works even without internet connection
+## Features
 
-### 🚀 **Developer-Friendly**
-- **Clean Architecture**: Well-structured, maintainable codebase
-- **REST APIs**: Comprehensive backend with Socket.io real-time features
-- **Docker Ready**: Easy deployment with containerization
-- **Extensive Logging**: Detailed debugging and monitoring
+### Security
 
-## 🎯 Use Cases
+* ✅ FIDO2/WebAuthn compliance
+* ✅ Biometric authentication (Face ID, fingerprint, hardware keys)
+* ✅ End-to-end encryption with certificate pinning
+* ✅ Session revocation & audit logging
+* ✅ Hardware Security Module (HSM) integration
 
-- **Enterprise SSO**: Replace traditional passwords in corporate environments
-- **Banking & Finance**: Secure customer authentication for financial apps
-- **Healthcare**: HIPAA-compliant patient authentication systems
-- **E-commerce**: Seamless checkout with biometric verification
-- **Personal Projects**: Secure authentication for your own applications
+### Developer Experience
 
+* Clean, modular architecture
+* REST + real-time APIs (Socket.io)
+* Dockerized deployment
+* Detailed logs for observability and debugging
 
-## 🚀 Quick Start
+### Platform Support
 
-### Prerequisites
-- Flutter SDK (≥3.0.0)
-- Node.js (≥18.0.0)
-- npm or yarn
+* **Mobile:** Flutter app (iOS & Android) with offline mode, push notifications, and lightweight background footprint
+* **Web:** Next.js dashboard with admin panel, user/device management, and real-time monitoring
 
-### 1. Clone the Repository
+---
+
+## Use Cases
+
+* **Enterprise SSO** – Replace internal passwords with secure biometric authentication.
+* **Banking/Finance** – Customer authentication with regulatory-grade security.
+* **Healthcare** – HIPAA-compliant access control.
+* **E-commerce** – Passwordless checkout flows.
+* **Personal projects** – Simple, secure authentication drop-in.
+
+---
+
+## Quick Start
+
+### Requirements
+
+* Flutter SDK ≥ 3.0.0
+* Node.js ≥ 18.0.0
+* npm or yarn
+
+### Setup
+
 ```bash
+# Clone
 git clone https://github.com/yourusername/FastKey.git
 cd FastKey
-```
 
-### 2. Setup Backend
-```bash
+# Backend
 cd backend
 npm install
 npm start
-```
 
-### 3. Setup Frontend (Web)
-```bash
-cd frontend
+# Web frontend
+cd ../frontend
 npm install
 npm run dev
-```
 
-### 4. Setup Mobile App
-```bash
-cd app
+# Mobile
+cd ../app
 flutter pub get
 flutter run
 ```
 
-### 5. Production Deployment
+### Production
+
 ```bash
 # Backend
 cd backend
-npm run build
-npm run start:prod
+npm run build && npm run start:prod
 
 # Frontend
 cd frontend
-npm run build
-npm start
+npm run build && npm start
 
-# Mobile (Build APK)
+# Mobile (APK)
 cd app
 flutter build apk --release
 ```
 
-## 📱 Mobile App Features
+---
 
-<div align="center">
-  
-| Feature | Description |
-|---------|-------------|
-| 🔒 **Biometric Login** | Fingerprint, Face ID, and PIN authentication |
-| 📬 **Push Notifications** | Real-time login request alerts |
-| 🔄 **Auto-Sync** | Seamless synchronization across devices |
-| 🎨 **Modern UI** | Beautiful, intuitive user interface |
-| 🔋 **Battery Optimized** | Efficient background processing |
-| 🌐 **Offline Mode** | Works without internet connection |
-
-</div>
-
-## 🌐 Web Features
-
-- **Responsive Design**: Works on desktop, tablet, and mobile browsers
-- **Real-time Dashboard**: Live authentication status and user management
-- **Admin Panel**: Comprehensive user and system management
-- **Analytics**: Detailed authentication logs and security insights
-- **Multi-tenant**: Support for multiple organizations
-
-## 🔧 API Endpoints
+## API Overview
 
 ### Authentication
+
 ```http
 POST /api/auth/register          # Register new user
 POST /api/auth/login             # Initiate login flow
-GET  /api/auth/status/:sessionId # Check authentication status
-POST /api/auth/verify            # Verify biometric credential
+GET  /api/auth/status/:sessionId # Check login status
+POST /api/auth/verify            # Verify credential
 ```
 
 ### User Management
+
 ```http
-GET    /api/users                # List all users
+GET    /api/users                # List users
 GET    /api/users/:id            # Get user details
 PUT    /api/users/:id            # Update user
 DELETE /api/users/:id            # Delete user
 ```
 
 ### Security
+
 ```http
-GET  /api/security/logs          # Get security audit logs
-POST /api/security/revoke        # Revoke user sessions
+GET  /api/security/logs          # Audit logs
+POST /api/security/revoke        # Revoke sessions
 GET  /api/security/devices       # List registered devices
 ```
+---
 
-## 📊 Performance
+## License
 
-- **Authentication Speed**: < 2 seconds average
-- **App Size**: ~15MB (optimized APK)
-- **Memory Usage**: < 50MB RAM
-- **Battery Impact**: Minimal background usage
-- **Network**: Optimized for low bandwidth
-
-## 🔒 Security Features
-
-- ✅ **FIDO2/WebAuthn Compliance**
-- ✅ **Hardware Security Module Support**
-- ✅ **Biometric Template Protection**
-- ✅ **Certificate Pinning**
-- ✅ **Runtime Application Self-Protection (RASP)**
-- ✅ **Comprehensive Audit Logging**
-
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- FIDO Alliance for the WebAuthn standard
-- Flutter team for the amazing framework
-- The open-source community for inspiration and tools
+MIT License – see [LICENSE](LICENSE) for details.
 
 ---
 
-<div align="center">
-  <p><strong>Built with ❤️ by Satwik Singhs</strong></p>
-  <p>⭐ Star this repo if you find it helpful!</p>
-</div>
+<p align="center"><strong>Built by Satwik Singh :) </strong></p>
+
