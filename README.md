@@ -160,40 +160,10 @@ GET  /api/security/devices       # List registered devices
 - ✅ **Runtime Application Self-Protection (RASP)**
 - ✅ **Comprehensive Audit Logging**
 
-## 🛣️ Roadmap
-
-### Q1 2024
-- [ ] Apple Watch app integration
-- [ ] Advanced analytics dashboard
-- [ ] Multi-factor authentication combinations
-
-### Q2 2024
-- [ ] Desktop applications (Windows, macOS, Linux)
-- [ ] Hardware security key support
-- [ ] Advanced admin controls
-
-### Q3 2024
-- [ ] Enterprise SSO integrations
-- [ ] API rate limiting and throttling
-- [ ] Advanced threat detection
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 👨‍💻 Authors
-
-- **Your Name** - *Initial work* - [YourGitHub](https://github.com/yourusername)
 
 ## 🙏 Acknowledgments
 
@@ -201,15 +171,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Flutter team for the amazing framework
 - The open-source community for inspiration and tools
 
-## 📞 Support
-
-- 📧 Email: support@fastkey.dev
-- 💬 Discord: [Join our community](https://discord.gg/fastkey)
-- 📖 Documentation: [docs.fastkey.dev](https://docs.fastkey.dev)
-
 ---
 
 <div align="center">
-  <p><strong>Built with ❤️ by developers, for developers</strong></p>
+  <p><strong>Built with ❤️ by Satwik Singhs</strong></p>
   <p>⭐ Star this repo if you find it helpful!</p>
 </div>
