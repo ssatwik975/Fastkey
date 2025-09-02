@@ -3,26 +3,29 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:fastkey/models/login_request.dart';
 import 'package:fastkey/services/storage_service.dart';
 import 'package:fastkey/services/notification_service.dart';
+import 'package:fastkey/providers/approval_provider.dart';
 
 class SocketService {
   IO.Socket? _socket;
   final _storage = const FlutterSecureStorage();
   final StorageService _storageService = StorageService();
   final NotificationService _notificationService = NotificationService();
+  
+  Function(LoginRequest)? onLoginRequest;
 
-  // Socket.io server URL - same as backend
   static const String socketUrl = 'https://fastkey.onrender.com';
-  // For local development, use your local IP address instead of localhost
-  // static const String socketUrl = 'http://192.168.1.x:5001';
 
-  Future<void> initialize() async {
-    if (_socket != null) {
-      print('Socket already initialized, returning');
+  Future<void> initialize({Function(LoginRequest)? onRequestCallback}) async {
+    if (onRequestCallback != null) {
+      onLoginRequest = onRequestCallback;
+    }
+    
+    if (_socket != null && _socket!.connected) {
+      print('Socket already connected, returning');
       return;
     }
 
     try {
-      // Get stored user data
       final userData = await _storageService.getUserData();
       final deviceToken = await _storageService.getDeviceToken();
       
@@ -35,154 +38,146 @@ class SocketService {
         return;
       }
 
-      // Initialize Socket.io client with additional options
+      // Disconnect existing socket if any
+      if (_socket != null) {
+        _socket!.disconnect();
+        _socket = null;
+      }
+
+      // Initialize Socket.io client
       _socket = IO.io(socketUrl, <String, dynamic>{
-        'transports': ['websocket'],
-        'autoConnect': true,
+        'transports': ['websocket', 'polling'],
+        'autoConnect': false,
         'reconnection': true,
         'reconnectionAttempts': 5,
-        'reconnectionDelay': 1000,
+        'reconnectionDelay': 2000,
+        'timeout': 10000,
       });
 
-      // Updated socket event handlers for v3.x
+      // Set up event handlers BEFORE connecting
       _socket!.onConnect((_) {
-        print('Socket connected');
+        print('✅ Socket connected successfully!');
         
         // Register for mobile-specific events
+        print('📱 Registering mobile listener for user: ${userData.username}');
         _socket!.emit('register-mobile-listener', {
           'username': userData.username,
           'deviceToken': deviceToken,
         });
+        
+        // Also join the mobile room explicitly
+        _socket!.emit('join-mobile-room', {
+          'username': userData.username,
+        });
       });
 
-      _socket!.onDisconnect((_) {
-        print('Socket disconnected');
+      _socket!.onDisconnect((reason) {
+        print('❌ Socket disconnected: $reason');
       });
 
       _socket!.onConnectError((data) {
-        print('Socket connect error: $data');
-      });
-
-      // These methods remain the same
-      _socket!.on('login_request', (data) {
-        // Your login request handler
-      });
-
-      _socket!.on('auth_approved', (data) {
-        // Your auth approved handler
+        print('🚫 Socket connect error: $data');
       });
       
-      // Connect to socket
-      _socket!.connect();
+      _socket!.onError((data) {
+        print('⚠️ Socket error: $data');
+      });
 
-      // Socket event handlers
-      _socket!.onConnect((_) {
-        print('Socket connected');
-        
-        // Register for mobile-specific events
+      _socket!.onReconnect((attemptNumber) {
+        print('🔄 Socket reconnected after $attemptNumber attempts');
+        // Re-register when reconnecting
         _socket!.emit('register-mobile-listener', {
           'username': userData.username,
           'deviceToken': deviceToken,
         });
       });
 
-      _socket!.onDisconnect((_) {
-        print('Socket disconnected');
+      // Listen for login requests - this is the critical part
+      final loginEventName = 'login-request:${userData.username}';
+      print('👂 Setting up listener for event: $loginEventName');
+      
+      _socket!.on(loginEventName, (data) {
+        print('🔔 Received login request: $data');
+        _handleLoginRequest(data);
       });
 
-      _socket!.onError((error) {
-        print('Socket error: $error');
+      // Also listen for a generic mobile notification event as fallback
+      _socket!.on('mobile-login-request', (data) {
+        print('📱 Received mobile login request: $data');
+        if (data['username'] == userData.username) {
+          _handleLoginRequest(data);
+        }
       });
 
-      // Listen for login requests
-      _setupLoginRequestListener(userData.username, deviceToken);
+      // Test connectivity
+      _socket!.on('connect', (_) {
+        print('🧪 Testing socket connection...');
+        _socket!.emit('ping', {'timestamp': DateTime.now().toIso8601String()});
+      });
+
+      _socket!.on('pong', (data) {
+        print('🏓 Received pong: $data');
+      });
+
+      // Connect to socket
+      _socket!.connect();
+      print('🚀 Socket connection initiated');
 
     } catch (e) {
-      print('Error initializing socket: $e');
+      print('💥 Error initializing socket: $e');
     }
   }
 
-  void _setupLoginRequestListener(String username, String deviceToken) {
-    // Initialize notification service
-    _notificationService.initialize();
-    
-    // Listen for login requests specific to this device
-    _socket?.on('login-request:$username', (data) {
-      print('Received login request for username: $username');
+  void _handleLoginRequest(dynamic data) {
+    try {
+      print('Processing login request data: $data');
       
-      if (data != null && data['sessionId'] != null) {
-        // Create login request object
-        final loginRequest = LoginRequest(
-          sessionId: data['sessionId'],
-          username: username,
-          timestamp: data['timestamp'] != null 
-              ? DateTime.parse(data['timestamp']) 
-              : DateTime.now(),
-          deviceInfo: data['deviceInfo'],
-        );
-        
-        // Show notification
-        _notificationService.showLoginRequestNotification(
-          username: username,
-          sessionId: data['sessionId'],
-          deviceInfo: data['deviceInfo'],
-        );
-        
-        // Notify listeners
-        if (_onLoginRequestCallbacks.isNotEmpty) {
-          for (final callback in _onLoginRequestCallbacks) {
-            callback(loginRequest);
-          }
-        }
+      final loginRequest = LoginRequest(
+        sessionId: data['sessionId'] ?? '',
+        username: data['username'] ?? '',
+        timestamp: data['timestamp'] != null 
+            ? DateTime.parse(data['timestamp']) 
+            : DateTime.now(),
+        deviceInfo: data['deviceInfo'],
+        location: data['location'],
+      );
+      
+      print('Created login request: ${loginRequest.sessionId} for ${loginRequest.username}');
+      
+      // Show notification
+      _notificationService.showLoginRequestNotification(
+        username: loginRequest.username,
+        sessionId: loginRequest.sessionId,
+        deviceInfo: loginRequest.deviceInfo,
+      );
+      
+      // Call the callback if it exists
+      if (onLoginRequest != null) {
+        print('Calling login request callback');
+        onLoginRequest!(loginRequest);
+      } else {
+        print('⚠️ No login request callback registered');
       }
-    });
-    
-    // Also listen for device-specific requests as fallback
-    _socket?.on('login-request:$username:$deviceToken', (data) {
-      print('Received device-specific login request');
-      if (data != null && data['sessionId'] != null) {
-        final loginRequest = LoginRequest(
-          sessionId: data['sessionId'],
-          username: username,
-          timestamp: data['timestamp'] != null 
-              ? DateTime.parse(data['timestamp']) 
-              : DateTime.now(),
-          deviceInfo: data['deviceInfo'],
-        );
-        
-        // Show notification
-        _notificationService.showLoginRequestNotification(
-          username: username,
-          sessionId: data['sessionId'],
-          deviceInfo: data['deviceInfo'],
-        );
-        
-        if (_onLoginRequestCallbacks.isNotEmpty) {
-          for (final callback in _onLoginRequestCallbacks) {
-            callback(loginRequest);
-          }
-        }
-      }
-    });
-  }
-
-  // Callback management for login requests
-  final List<Function(LoginRequest)> _onLoginRequestCallbacks = [];
-
-  void onLoginRequest(Function(LoginRequest) callback) {
-    _onLoginRequestCallbacks.add(callback);
-  }
-
-  void removeLoginRequestListener(Function(LoginRequest) callback) {
-    _onLoginRequestCallbacks.remove(callback);
+    } catch (e) {
+      print('💥 Error processing login request: $e');
+    }
   }
 
   void disconnect() {
-    _socket?.disconnect();
-    _socket = null;
+    print('🔌 Disconnecting socket service');
+    if (_socket != null) {
+      _socket!.disconnect();
+      _socket = null;
+    }
   }
 
-  bool isConnected() {
-    return _socket?.connected ?? false;
+  bool get isConnected => _socket?.connected ?? false;
+  
+  // Add a method to manually check connection and reconnect if needed
+  Future<void> ensureConnected() async {
+    if (_socket == null || !_socket!.connected) {
+      print('🔄 Socket not connected, reinitializing...');
+      await initialize();
+    }
   }
 }

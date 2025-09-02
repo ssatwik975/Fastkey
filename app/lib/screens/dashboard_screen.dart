@@ -5,6 +5,9 @@ import 'package:fastkey/providers/auth_provider.dart';
 import 'package:fastkey/providers/approval_provider.dart';
 import 'package:fastkey/screens/auth_screen.dart';
 import 'package:fastkey/models/login_history.dart';
+import 'package:fastkey/services/notification_service.dart';
+import 'package:fastkey/screens/approval_screen.dart';
+import 'package:fastkey/models/login_request.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -17,10 +20,58 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // Refresh login history on init
-    Future.microtask(() {
-      Provider.of<AuthProvider>(context, listen: false).fetchLoginHistory();
+    
+    // IMMEDIATELY set up the callback - this is critical!
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupLoginRequestHandler();
     });
+  }
+
+  void _setupLoginRequestHandler() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final approvalProvider = Provider.of<ApprovalProvider>(context, listen: false);
+    
+    print('🔧 Setting up login request handler in dashboard');
+    
+    // Set up the callback to connect socket service with approval provider
+    authProvider.setLoginRequestCallback((LoginRequest loginRequest) {
+      print('📱 Received login request in dashboard: ${loginRequest.sessionId}');
+      approvalProvider.addLoginRequest(loginRequest);
+    });
+    
+    // Refresh login history after callback is set
+    authProvider.fetchLoginHistory();
+    
+    // Debug message to check if provider is working
+    print('Approval provider has ${approvalProvider.pendingRequests.length} pending requests');
+    
+    // Check for notifications
+    final notificationService = NotificationService();
+    final sessionId = notificationService.getAndClearLatestPayload();
+    
+    if (sessionId != null) {
+      // Handle the notification click
+      final username = authProvider.user?.username;
+      
+      if (username != null) {
+        // Create a login request and navigate to approval screen
+        final loginRequest = LoginRequest(
+          sessionId: sessionId,
+          username: username,
+          timestamp: DateTime.now(),
+        );
+        
+        // Add a slight delay to ensure the screen is fully loaded
+        Future.delayed(const Duration(milliseconds: 500), () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ApprovalScreen(request: loginRequest),
+            ),
+          );
+        });
+      }
+    }
   }
 
   @override

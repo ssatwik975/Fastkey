@@ -1,9 +1,14 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:fastkey/models/login_request.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
   bool _isInitialized = false;
+  
+  // Store the notification payload to be processed later
+  String? latestNotificationPayload;
 
   factory NotificationService() {
     return _instance;
@@ -31,13 +36,17 @@ class NotificationService {
 
     await _notificationsPlugin.initialize(
       initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse details) {
-        print('Notification clicked: ${details.payload}');
-      },
+      onDidReceiveNotificationResponse: _onNotificationTapped,
     );
     
     _isInitialized = true;
     print('Notification service initialized');
+  }
+
+  void _onNotificationTapped(NotificationResponse details) {
+    print('Notification clicked: ${details.payload}');
+    // Store the payload for later use
+    latestNotificationPayload = details.payload;
   }
 
   Future<void> showLoginRequestNotification({
@@ -71,9 +80,16 @@ class NotificationService {
     await _notificationsPlugin.show(
       sessionId.hashCode,  // Use sessionId hash as notification ID
       'FastKey Login Request',
-      'Someone is trying to log in as $username',
+      'Someone is trying to log in as $username from ${deviceInfo ?? "unknown device"}',
       platformDetails,
       payload: sessionId,
     );
+  }
+
+  // Get and clear the latest notification payload
+  String? getAndClearLatestPayload() {
+    final payload = latestNotificationPayload;
+    latestNotificationPayload = null;
+    return payload;
   }
 }

@@ -1,9 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:fastkey/models/user.dart';
 import 'package:fastkey/models/login_history.dart';
+import 'package:fastkey/models/login_request.dart';
 import 'package:fastkey/services/auth_service.dart';
 import 'package:fastkey/services/storage_service.dart';
 import 'package:fastkey/services/api_service.dart';
+import 'package:fastkey/services/socket_service.dart';
+import 'package:provider/provider.dart';
+
+import 'approval_provider.dart';
 
 enum AuthStatus {
   initial,
@@ -25,6 +30,11 @@ class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
   final StorageService _storageService = StorageService();
   final ApiService _apiService = ApiService();
+  final SocketService _socketService = SocketService();
+
+  // Add this to store the approval provider callback
+  Function(LoginRequest)? _onLoginRequestCallback;
+  bool _socketInitialized = false;
 
   AuthStatus get status => _status;
   User? get user => _user;
@@ -38,6 +48,33 @@ class AuthProvider with ChangeNotifier {
     _initialize();
   }
 
+  // Add this method to set the callback from the UI
+  void setLoginRequestCallback(Function(LoginRequest) callback) {
+    print('🔗 Setting login request callback');
+    _onLoginRequestCallback = callback;
+    
+    // Initialize socket service now that we have the callback
+    if (isAuthenticated && !_socketInitialized) {
+      print('🚀 Initializing socket service with callback');
+      _initializeSocketService();
+    }
+  }
+
+  Future<void> _initializeSocketService() async {
+    if (_socketInitialized || _onLoginRequestCallback == null) return;
+    
+    try {
+      print('📡 Initializing socket service...');
+      await _socketService.initialize(
+        onRequestCallback: _onLoginRequestCallback!
+      );
+      _socketInitialized = true;
+      print('✅ Socket service initialized successfully');
+    } catch (e) {
+      print('❌ Failed to initialize socket service: $e');
+    }
+  }
+
   Future<void> _initialize() async {
     try {
       print('Initializing auth provider...');
@@ -47,7 +84,7 @@ class AuthProvider with ChangeNotifier {
       final userData = await _storageService.getUserData();
       final storedToken = await _storageService.getToken();
       
-      print('Retrieved user data: ${userData != null}');
+      print('Retrieved user data from secure storage: ${userData != null ? "found" : "not found"}');
       print('Retrieved token: ${storedToken != null}');
       
       if (userData != null && storedToken != null) {
@@ -56,8 +93,8 @@ class AuthProvider with ChangeNotifier {
         _status = AuthStatus.authenticated;
         print('Auth provider initialized with authenticated user: ${userData.username}');
         
-        // Fetch login history for the authenticated user
-        fetchLoginHistory();
+        // DON'T initialize socket here - wait for callback to be set
+        // fetchLoginHistory(); // Also wait for callback
       } else {
         _status = AuthStatus.unauthenticated;
         print('Auth provider initialized but no user data found');
@@ -87,6 +124,11 @@ class AuthProvider with ChangeNotifier {
         _status = AuthStatus.authenticated;
         notifyListeners();
         
+        // Initialize socket service with callback if available
+        if (_onLoginRequestCallback != null && !_socketInitialized) {
+          await _initializeSocketService();
+        }
+        
         // Fetch login history
         fetchLoginHistory();
         
@@ -105,6 +147,11 @@ class AuthProvider with ChangeNotifier {
           
           await _storageService.saveUserData(_user!);
           await _storageService.saveToken(_token);
+          
+          // Initialize socket service with callback if available
+          if (_onLoginRequestCallback != null && !_socketInitialized) {
+            await _initializeSocketService();
+          }
           
           _status = AuthStatus.authenticated;
           notifyListeners();
@@ -129,12 +176,17 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Disconnect socket
+    _socketService.disconnect();
+    _socketInitialized = false;
+    
     await _storageService.clearUserData();
     await _storageService.clearToken();
     _user = null;
     _token = null;
     _loginHistory = [];
     _status = AuthStatus.unauthenticated;
+    _onLoginRequestCallback = null;
     notifyListeners();
   }
 

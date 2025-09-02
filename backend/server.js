@@ -344,7 +344,7 @@ io.on('connection', (socket) => {
       console.log(`QR requested for ${username}, registration: ${isRegistration}, socket: ${socket.id}`);
       
       // Using environment variable for frontend URL
-      const frontendUrl = process.env.FRONTEND_URL || 'https://fastkey-gamma.vercel.app';
+      const frontendUrl = process.env.FRONTEND_URL || 'https://fastkey.satwik.in';
       const url = `${frontendUrl}/mobile-auth/${sessionId}?username=${encodeURIComponent(username)}${isRegistration ? '&register=true' : ''}`;
       
       console.log(`Generated QR URL: ${url}`);

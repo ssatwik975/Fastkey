@@ -5,8 +5,11 @@ import 'package:fastkey/providers/auth_provider.dart';
 import 'package:fastkey/providers/approval_provider.dart';
 import 'package:fastkey/screens/auth_screen.dart';
 import 'package:fastkey/screens/dashboard_screen.dart';
+import 'package:fastkey/services/socket_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
   runApp(const FastKeyApp());
 }
 
