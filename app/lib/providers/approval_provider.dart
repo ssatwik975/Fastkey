@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:fastkey/models/login_request.dart';
+import 'package:fastkey/models/login_history.dart';
 import 'package:fastkey/services/auth_service.dart';
+import 'package:fastkey/services/api_service.dart';
 
 class ApprovalProvider with ChangeNotifier {
   List<LoginRequest> _pendingRequests = [];
@@ -8,6 +10,7 @@ class ApprovalProvider with ChangeNotifier {
   String? _errorMessage;
 
   final AuthService _authService = AuthService();
+  final ApiService _apiService = ApiService();
 
   List<LoginRequest> get pendingRequests => _pendingRequests;
   bool get isProcessing => _isProcessing;
@@ -49,6 +52,10 @@ class ApprovalProvider with ChangeNotifier {
 
       if (result.success) {
         request.approved = true;
+        
+        // Save to login history
+        await _saveToLoginHistory(request, true);
+        
         removeLoginRequest(request.sessionId);
         _isProcessing = false;
         notifyListeners();
@@ -67,10 +74,28 @@ class ApprovalProvider with ChangeNotifier {
     }
   }
 
-  void denyLogin(LoginRequest request) {
+  Future<void> denyLogin(LoginRequest request) async {
     request.denied = true;
+    
+    // Save to login history as denied
+    await _saveToLoginHistory(request, false);
+    
     removeLoginRequest(request.sessionId);
     notifyListeners();
+  }
+
+  Future<void> _saveToLoginHistory(LoginRequest request, bool successful) async {
+    try {
+      final history = LoginHistory.fromLoginRequest(request, successful);
+      
+      // Save to API/database (you might want to implement this endpoint)
+      await _apiService.saveLoginHistory(history);
+      
+      print('Login history saved: ${request.sessionId} - ${successful ? 'approved' : 'denied'}');
+    } catch (e) {
+      print('Failed to save login history: $e');
+      // Don't throw error as this is not critical
+    }
   }
 
   void clearError() {

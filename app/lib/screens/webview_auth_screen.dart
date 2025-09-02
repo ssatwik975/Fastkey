@@ -23,30 +23,80 @@ class WebViewAuthScreen extends StatefulWidget {
   State<WebViewAuthScreen> createState() => _WebViewAuthScreenState();
 }
 
-class _WebViewAuthScreenState extends State<WebViewAuthScreen> {
+class _WebViewAuthScreenState extends State<WebViewAuthScreen> with TickerProviderStateMixin {
   bool _isLoading = false;
-  final String _sessionId = const Uuid().v4();
+  final String _sessionId = const Uuid().v4(); // Generate session ID locally
   String? _errorMessage;
   Timer? _pollingTimer;
   bool _isAuthenticated = false;
+  int _currentStep = 0;
+  int _pollAttempts = 0;
+  static const int _maxPollAttempts = 150;
   
+  late AnimationController _pulseController;
+  late AnimationController _stepController;
+  late Animation<double> _pulseAnimation;
+  late Animation<double> _stepAnimation;
+  
+  final List<String> _steps = [
+    'Opening secure browser...',
+    'Waiting for biometric verification...',
+    'Processing authentication...',
+    'Almost done...',
+  ];
+
   @override
   void initState() {
     super.initState();
+    
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    
+    _stepController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    
+    _pulseAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.1,
+    ).animate(CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeInOut,
+    ));
+    
+    _stepAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _stepController,
+      curve: Curves.easeOut,
+    ));
+    
+    _pulseController.repeat(reverse: true);
+    _stepController.forward();
+    
     Future.microtask(() => _launchBrowser());
   }
   
   @override
   void dispose() {
     _pollingTimer?.cancel();
+    _pulseController.dispose();
+    _stepController.dispose();
     super.dispose();
   }
   
   Future<void> _launchBrowser() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _currentStep = 0;
+    });
     
     try {
-      final frontendUrl = 'https://fastkey.satwik.in';
+      const frontendUrl = 'https://fastkey.satwik.in';
       final encodedUsername = Uri.encodeComponent(widget.username);
       
       final urlPath = widget.isRegistration 
@@ -55,8 +105,9 @@ class _WebViewAuthScreenState extends State<WebViewAuthScreen> {
       
       final authUrl = '$frontendUrl$urlPath';
       
-      print('Opening browser URL: $authUrl');
-      print('User type: ${widget.isRegistration ? "New User (Registration)" : "Existing User (Login)"}');
+      print('🌐 Opening browser URL: $authUrl');
+      print('👤 User type: ${widget.isRegistration ? "New User (Registration)" : "Existing User (Login)"}');
+      print('🆔 Session ID: $_sessionId');
       
       final uri = Uri.parse(authUrl);
       
@@ -67,12 +118,7 @@ class _WebViewAuthScreenState extends State<WebViewAuthScreen> {
         );
         
         if (launched) {
-          setState(() {
-            _isLoading = false;
-            _errorMessage = null;
-          });
-          
-          // Start polling for authentication status
+          _updateStep(1);
           _startPolling();
         } else {
           throw Exception('Could not launch $uri');
@@ -83,313 +129,369 @@ class _WebViewAuthScreenState extends State<WebViewAuthScreen> {
           mode: LaunchMode.externalApplication,
         );
         
-        if (!launched) {
+        if (launched) {
+          _updateStep(1);
+          _startPolling();
+        } else {
           throw Exception('String launch failed for $authUrl');
         }
-        
-        setState(() {
-          _isLoading = false;
-          _errorMessage = null;
-        });
-        
-        // Start polling for authentication status
-        _startPolling();
       } else {
-        throw Exception('Cannot launch URL: No app available');
+        throw Exception('Cannot launch URL: $authUrl');
       }
-      
     } catch (e) {
-      print('Error launching browser: $e');
       setState(() {
-        _isLoading = false;
         _errorMessage = 'Failed to open browser: ${e.toString()}';
+        _isLoading = false;
       });
     }
   }
   
-  // Update to handle the session ID mismatch issue
-
-  void _startPolling() {
-    // Poll every 2 seconds to check if authentication was successful
+  void _updateStep(int step) {
+    if (step < _steps.length) {
+      setState(() {
+        _currentStep = step;
+      });
+      _stepController.reset();
+      _stepController.forward();
+    }
+  }
+  
+  void _startPolling() async {
+    // Start polling after 3 seconds to give user time to complete auth
+    await Future.delayed(const Duration(seconds: 3));
+    
+    if (!mounted) return;
+    
+    _updateStep(2);
+    
+    print('🔄 Starting auth status polling for session: $_sessionId');
+    
     _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      if (_isAuthenticated || !mounted) {
+        timer.cancel();
+        return;
+      }
+      
+      _pollAttempts++;
+      print('🔍 Poll attempt $_pollAttempts/$_maxPollAttempts for session: $_sessionId');
+      
       try {
-        final apiService = ApiService();
+        final response = await ApiService().checkAuthStatus(
+          _sessionId, 
+          widget.username
+        );
         
-        // First try with the original session ID
-        var response = await apiService.checkAuthStatus(_sessionId);
-        
-        // If that fails, try the fallback approach - check recent successful auths
-        if (!response.success || response.data['success'] != true) {
-          // Fetch recent auth sessions from server (new endpoint needed)
-          response = await apiService.get('/api/recent-auths/${widget.username}');
-          
-          if (!response.success) {
-            print('No successful auth found for username: ${widget.username}');
-            return;
-          }
-        }
-        
-        if (response.success && response.data['success'] == true) {
-          // Authentication was successful
+        if (response.success && response.data != null) {
+          print('🎉 Authentication successful! Token received.');
           timer.cancel();
           
-          if (mounted) {
-            setState(() => _isAuthenticated = true);
-            
-            // Get the auth token
-            final token = response.data['token'];
-            
-            // Update the auth provider
-            final authProvider = Provider.of<AuthProvider>(context, listen: false);
-            await authProvider.authenticate(
-              widget.username,
-              token: token,
+          setState(() {
+            _isAuthenticated = true;
+          });
+          
+          _updateStep(3);
+          await Future.delayed(const Duration(milliseconds: 1500));
+          
+          final token = response.data['token'];
+          if (token == null) {
+            throw Exception('No token received from server');
+          }
+          
+          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          
+          final success = await authProvider.authenticate(
+            widget.username,
+            token: token,
+          );
+          
+          if (success && mounted) {
+            print('✅ Navigating to dashboard');
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const DashboardScreen()),
             );
-            
-            // Show success and navigate to dashboard
-            HapticFeedback.mediumImpact();
-            
-            _showSuccessAndNavigate();
+          } else {
+            throw Exception('Failed to authenticate with received token');
+          }
+        } else if (_pollAttempts >= _maxPollAttempts) {
+          // Timeout reached
+          timer.cancel();
+          if (mounted) {
+            setState(() {
+              _errorMessage = 'Authentication timeout. Please try again.';
+              _isLoading = false;
+            });
           }
         }
       } catch (e) {
-        print('Error checking auth status: $e');
+        print('💥 Polling error: $e');
+        
+        if (_pollAttempts >= _maxPollAttempts) {
+          timer.cancel();
+          if (mounted) {
+            setState(() {
+              _errorMessage = 'Authentication timeout. Please try again.';
+              _isLoading = false;
+            });
+          }
+        }
       }
     });
   }
-  
-  void _showSuccessAndNavigate() {
-    // Show success snackbar
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Authentication successful!'),
-        backgroundColor: Color(0xFF30D158),
-      ),
-    );
-    
-    // Navigate to dashboard
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const DashboardScreen()),
-      (route) => false,
-    );
-  }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: Text(widget.isRegistration ? 'Create Account' : 'Sign In'),
-        centerTitle: true,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: SingleChildScrollView(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Icon
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: widget.isRegistration 
-                        ? [const Color(0xFF30D158), const Color(0xFF32D74B)]
-                        : [const Color(0xFF2563EB), const Color(0xFF7C3AED)],
+              // Header
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.arrow_back),
                   ),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Icon(
-                  widget.isRegistration 
-                      ? Icons.person_add_rounded
-                      : Icons.login_rounded,
-                  size: 48,
-                  color: Colors.white,
-                ),
-              ),
-              
-              const SizedBox(height: 32),
-              
-              // Title
-              Text(
-                widget.isRegistration 
-                    ? 'Complete Registration in Browser'
-                    : 'Verify Your Identity in Browser',
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Description
-              Text(
-                widget.isRegistration
-                    ? 'Your browser opened to complete biometric setup for ${widget.username}. After completing the setup, you\'ll be automatically redirected.'
-                    : 'Your browser opened to verify your identity for ${widget.username}. After verification, you\'ll be automatically redirected.',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                  height: 1.4,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              
-              const SizedBox(height: 40),
-              
-              // Loading or error state
-              if (_isLoading) ...[
-                const CircularProgressIndicator(),
-                const SizedBox(height: 16),
-                const Text('Opening browser...'),
-              ] else if (_errorMessage != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF3B30).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: const Color(0xFFFF3B30).withOpacity(0.3),
+                  const Expanded(
+                    child: Text(
+                      'Secure Authentication',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ),
-                  child: Column(
-                    children: [
-                      const Icon(
-                        Icons.error_outline_rounded,
-                        color: Color(0xFFFF3B30),
-                        size: 32,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _errorMessage!,
-                        style: const TextStyle(fontSize: 16),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _launchBrowser,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2563EB),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text('Try Again', style: TextStyle(fontSize: 16)),
-                  ),
-                ),
-              ] else ...[
-                // Waiting for authentication
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF2F2F7),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    children: [
-                      const SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 3,
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        'Waiting for authentication...',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Please complete the process in your browser.',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                TextButton.icon(
-                  onPressed: _launchBrowser,
-                  icon: const Icon(Icons.launch_rounded),
-                  label: const Text('Open Browser Again'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF2563EB),
-                  ),
-                ),
-              ],
+                  const SizedBox(width: 48),
+                ],
+              ),
               
-              const Spacer(),
-              
-              // Security notice
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF2F2F7),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
+                    // Animated icon
+                    if (_isLoading && !_isAuthenticated) ...[
+                      AnimatedBuilder(
+                        animation: _pulseAnimation,
+                        builder: (context, child) {
+                          return Transform.scale(
+                            scale: _pulseAnimation.value,
+                            child: Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Color(0xFF2563EB),
+                                    Color(0xFF7C3AED),
+                                  ],
+                                ),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF2563EB).withOpacity(0.3),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.fingerprint_rounded,
+                                size: 40,
+                                color: Colors.white,
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                      child: const Icon(
-                        Icons.shield_rounded,
-                        color: Color(0xFF2563EB),
-                        size: 24,
+                    ] else if (_isAuthenticated) ...[
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF10B981).withOpacity(0.3),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.check_rounded,
+                          size: 40,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ] else if (_errorMessage != null) ...[
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFEF4444).withOpacity(0.3),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.error_outline_rounded,
+                          size: 40,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                    
+                    const SizedBox(height: 32),
+                    
+                    // Title
+                    Text(
+                      _isAuthenticated 
+                          ? 'Authentication Successful!'
+                          : _errorMessage != null
+                              ? 'Authentication Failed'
+                              : 'Authenticating...',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: _isAuthenticated 
+                            ? const Color(0xFF10B981)
+                            : _errorMessage != null
+                                ? const Color(0xFFEF4444)
+                                : const Color(0xFF1E293B),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Status message
+                    AnimatedBuilder(
+                      animation: _stepAnimation,
+                      builder: (context, child) {
+                        return Opacity(
+                          opacity: _stepAnimation.value,
+                          child: Text(
+                            _errorMessage ?? 
+                            (_isAuthenticated 
+                                ? 'Taking you to your dashboard...'
+                                : _currentStep < _steps.length 
+                                    ? _steps[_currentStep]
+                                    : 'Processing...'),
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey[600],
+                              height: 1.5,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        );
+                      },
+                    ),
+                    
+                    const SizedBox(height: 32),
+                    
+                    // Progress indicator for loading
+                    if (_isLoading && !_isAuthenticated && _errorMessage == null)
+                      const CircularProgressIndicator(),
+                    
+                    // Instructions for loading state
+                    if (_isLoading && !_isAuthenticated && _errorMessage == null) ...[
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0F9FF),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFF0EA5E9).withOpacity(0.2),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.info_outline,
+                              color: Color(0xFF0EA5E9),
+                              size: 24,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Please complete the biometric verification in your browser',
+                              style: TextStyle(
+                                color: Colors.blue[700],
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              
+              // Action buttons for error state
+              if (_errorMessage != null)
+                Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _errorMessage = null;
+                            _currentStep = 0;
+                            _pollAttempts = 0;
+                            _isAuthenticated = false;
+                          });
+                          _launchBrowser();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          backgroundColor: const Color(0xFF2563EB),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Try Again',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Security Guaranteed',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text(
+                          'Go Back',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
                           ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Your biometric data never leaves your device and stays private.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF8E8E93),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
             ],
           ),
         ),

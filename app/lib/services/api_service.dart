@@ -89,9 +89,64 @@ class ApiService {
     }
   }
   
-  // Add a method to check authentication status
-  Future<ApiResponse> checkAuthStatus(String sessionId) async {
-    return get('/api/auth-status/$sessionId');
+  // Fixed auth status check - now checks for any recent auth for the username
+  Future<ApiResponse> checkAuthStatus(String sessionId, String username) async {
+    try {
+      print('🔍 Checking auth status for session: $sessionId');
+      
+      // First try the specific session
+      final sessionResponse = await _client.get(
+        Uri.parse('$baseUrl/api/auth-status/$sessionId'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      );
+
+      print('📡 Session auth response: ${sessionResponse.statusCode}');
+      print('📄 Session auth body: ${sessionResponse.body}');
+
+      if (sessionResponse.statusCode == 200) {
+        final sessionData = jsonDecode(sessionResponse.body);
+        if (sessionData['success'] == true) {
+          print('✅ Found auth for specific session');
+          return ApiResponse(
+            success: true,
+            data: sessionData,
+          );
+        }
+      }
+      
+      // If specific session failed, check for any recent auth for this username
+      print('🔄 Checking for any recent auth for username: $username');
+      final recentResponse = await _client.get(
+        Uri.parse('$baseUrl/api/recent-auths/$username'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      );
+
+      print('📡 Recent auth response: ${recentResponse.statusCode}');
+      print('📄 Recent auth body: ${recentResponse.body}');
+
+      if (recentResponse.statusCode == 200) {
+        final recentData = jsonDecode(recentResponse.body);
+        if (recentData['success'] == true) {
+          print('✅ Found recent auth for username');
+          return ApiResponse(
+            success: true,
+            data: recentData,
+          );
+        }
+      }
+      
+      return ApiResponse(success: false);
+    } catch (e) {
+      print('💥 Auth status error: $e');
+      return ApiResponse(
+        success: false,
+        errorMessage: e.toString(),
+      );
+    }
   }
   
   // Add a method to fetch login history
@@ -104,5 +159,31 @@ class ApiService {
     }
     
     return [];
+  }
+  
+  Future<ApiResponse> saveLoginHistory(LoginHistory history) async {
+    try {
+      final response = await _client.post(
+        Uri.parse('$baseUrl/api/login-history'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(history.toJson()),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return ApiResponse(success: true);
+      } else {
+        return ApiResponse(
+          success: false,
+          errorMessage: 'Failed to save login history',
+        );
+      }
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        errorMessage: e.toString(),
+      );
+    }
   }
 }
