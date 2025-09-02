@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:fastkey/providers/auth_provider.dart';
-import 'package:fastkey/screens/splash_screen.dart';
+import 'package:fastkey/providers/approval_provider.dart';
+import 'package:fastkey/screens/auth_screen.dart';
+import 'package:fastkey/screens/dashboard_screen.dart';
 
 void main() {
   runApp(const FastKeyApp());
@@ -24,8 +26,11 @@ class FastKeyApp extends StatelessWidget {
       ),
     );
 
-    return ChangeNotifierProvider(
-      create: (context) => AuthProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => AuthProvider()),
+        ChangeNotifierProvider(create: (context) => ApprovalProvider()),
+      ],
       child: MaterialApp(
         title: 'FastKey',
         debugShowCheckedModeBanner: false,
@@ -40,11 +45,11 @@ class FastKeyApp extends StatelessWidget {
       useMaterial3: true,
       fontFamily: 'SF Pro Display', // iOS-style font
       colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF007AFF), // iOS Blue
+        seedColor: const Color(0xFF2563EB), // Primary blue
         brightness: Brightness.light,
       ).copyWith(
-        primary: const Color(0xFF007AFF),
-        secondary: const Color(0xFF5856D6),
+        primary: const Color(0xFF2563EB),
+        secondary: const Color(0xFF7C3AED),
         tertiary: const Color(0xFF30D158),
         surface: Colors.white,
         background: const Color(0xFFF2F2F7),
@@ -54,20 +59,20 @@ class FastKeyApp extends StatelessWidget {
         onSurface: const Color(0xFF1C1C1E),
         onBackground: const Color(0xFF1C1C1E),
       ),
-      scaffoldBackgroundColor: const Color(0xFFF2F2F7),
+      scaffoldBackgroundColor: Colors.white,
       appBarTheme: const AppBarTheme(
         elevation: 0,
         scrolledUnderElevation: 0,
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         foregroundColor: Color(0xFF1C1C1E),
         systemOverlayStyle: SystemUiOverlayStyle.dark,
         titleTextStyle: TextStyle(
           color: Color(0xFF1C1C1E),
-          fontSize: 17,
+          fontSize: 18,
           fontWeight: FontWeight.w600,
         ),
       ),
-      cardTheme: CardThemeData( // Fixed: Use CardThemeData instead of CardTheme
+      cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -78,7 +83,8 @@ class FastKeyApp extends StatelessWidget {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 0,
-          shadowColor: Colors.transparent,
+          backgroundColor: const Color(0xFF2563EB),
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -87,9 +93,8 @@ class FastKeyApp extends StatelessWidget {
             vertical: 14,
           ),
           textStyle: const TextStyle(
-            fontSize: 17,
+            fontSize: 16,
             fontWeight: FontWeight.w600,
-            letterSpacing: -0.4,
           ),
         ),
       ),
@@ -103,79 +108,120 @@ class FastKeyApp extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
           ),
           textStyle: const TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w400,
-            letterSpacing: -0.4,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Color(0xFFD1D1D6)),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Color(0xFFD1D1D6)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Color(0xFF007AFF), width: 2),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 2),
         ),
         filled: true,
         fillColor: const Color(0xFFF2F2F7),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: 12,
+          vertical: 14,
         ),
-        hintStyle: const TextStyle(
-          color: Color(0xFF8E8E93),
-          fontSize: 17,
-          fontWeight: FontWeight.w400,
+        hintStyle: TextStyle(
+          color: Colors.grey[500],
+          fontSize: 16,
         ),
       ),
-      textTheme: const TextTheme(
-        displayLarge: TextStyle(
-          fontSize: 34,
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF1C1C1E),
-          letterSpacing: -0.4,
-        ),
-        displayMedium: TextStyle(
-          fontSize: 28,
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF1C1C1E),
-          letterSpacing: -0.4,
-        ),
-        displaySmall: TextStyle(
-          fontSize: 22,
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF1C1C1E),
-          letterSpacing: -0.4,
-        ),
-        headlineMedium: TextStyle(
-          fontSize: 17,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF1C1C1E),
-          letterSpacing: -0.4,
-        ),
-        bodyLarge: TextStyle(
-          fontSize: 17,
-          fontWeight: FontWeight.w400,
-          color: Color(0xFF1C1C1E),
-          letterSpacing: -0.4,
-        ),
-        bodyMedium: TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w400,
-          color: Color(0xFF1C1C1E),
-          letterSpacing: -0.2,
-        ),
-        bodySmall: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w400,
-          color: Color(0xFF8E8E93),
-          letterSpacing: -0.1,
+    );
+  }
+}
+
+// Simple splash screen to handle authentication state
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    
+    // Check authentication state and navigate accordingly
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        
+        if (authProvider.isAuthenticated) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const DashboardScreen()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const AuthScreen()),
+          );
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF2563EB),
+                    Color(0xFF7C3AED),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF2563EB).withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.fingerprint_rounded,
+                size: 48,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'FastKey',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 32),
+            const CircularProgressIndicator(),
+          ],
         ),
       ),
     );

@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:fastkey/models/user.dart';
+import 'package:fastkey/models/login_history.dart';
 import 'package:fastkey/services/auth_service.dart';
 import 'package:fastkey/services/storage_service.dart';
+import 'package:fastkey/services/api_service.dart';
 
 enum AuthStatus {
   initial,
@@ -17,27 +19,24 @@ class AuthProvider with ChangeNotifier {
   User? _user;
   String? _token;
   String? _errorMessage;
-
-  // Add a new field
-  bool _needsRegistration = false;
+  List<LoginHistory> _loginHistory = [];
+  bool _isLoadingHistory = false;
 
   final AuthService _authService = AuthService();
   final StorageService _storageService = StorageService();
+  final ApiService _apiService = ApiService();
 
   AuthStatus get status => _status;
   User? get user => _user;
   String? get token => _token;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
-
-  // Add getter
-  bool get needsRegistration => _needsRegistration;
+  List<LoginHistory> get loginHistory => _loginHistory;
+  bool get isLoadingHistory => _isLoadingHistory;
 
   AuthProvider() {
     _initialize();
   }
-
-  // Update the _initialize method to add more logging for debugging
 
   Future<void> _initialize() async {
     try {
@@ -56,6 +55,9 @@ class AuthProvider with ChangeNotifier {
         _token = storedToken;
         _status = AuthStatus.authenticated;
         print('Auth provider initialized with authenticated user: ${userData.username}');
+        
+        // Fetch login history for the authenticated user
+        fetchLoginHistory();
       } else {
         _status = AuthStatus.unauthenticated;
         print('Auth provider initialized but no user data found');
@@ -67,35 +69,56 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> register(String username) async {
+  // New method to authenticate user with token
+  Future<bool> authenticate(String username, {String? token}) async {
     try {
       _status = AuthStatus.authenticating;
       _errorMessage = null;
-      _needsRegistration = false; // Reset this flag
       notifyListeners();
 
-      final deviceToken = await _storageService.getDeviceToken();
-      final result = await _authService.registerDevice(
-        username: username,
-        deviceToken: deviceToken,
-      );
-
-      if (result.success) {
-        _user = User(username: username, deviceToken: deviceToken);
-        _token = result.token;
+      if (token != null) {
+        // We already have a token from web authentication
+        _user = User(username: username);
+        _token = token;
         
         await _storageService.saveUserData(_user!);
         await _storageService.saveToken(_token);
         
         _status = AuthStatus.authenticated;
         notifyListeners();
+        
+        // Fetch login history
+        fetchLoginHistory();
+        
         return true;
       } else {
-        _errorMessage = result.errorMessage ?? 'Registration failed';
-        _needsRegistration = result.needsRegistration; // Set the flag
-        _status = AuthStatus.error;
-        notifyListeners();
-        return false;
+        // No token provided, attempt to register device
+        final deviceToken = await _storageService.getDeviceToken();
+        final result = await _authService.registerDevice(
+          username: username,
+          deviceToken: deviceToken,
+        );
+
+        if (result.success) {
+          _user = User(username: username, deviceToken: deviceToken);
+          _token = result.token;
+          
+          await _storageService.saveUserData(_user!);
+          await _storageService.saveToken(_token);
+          
+          _status = AuthStatus.authenticated;
+          notifyListeners();
+          
+          // Fetch login history
+          fetchLoginHistory();
+          
+          return true;
+        } else {
+          _errorMessage = result.errorMessage ?? 'Authentication failed';
+          _status = AuthStatus.error;
+          notifyListeners();
+          return false;
+        }
       }
     } catch (e) {
       _errorMessage = e.toString();
@@ -110,13 +133,29 @@ class AuthProvider with ChangeNotifier {
     await _storageService.clearToken();
     _user = null;
     _token = null;
+    _loginHistory = [];
     _status = AuthStatus.unauthenticated;
     notifyListeners();
   }
 
-  Future<void> updateToken(String token) async {
-    _token = token;
-    await _storageService.saveToken(token);
-    notifyListeners();
+  Future<void> fetchLoginHistory() async {
+    if (_user == null) return;
+    
+    try {
+      _isLoadingHistory = true;
+      notifyListeners();
+      
+      _loginHistory = await _apiService.getLoginHistory(
+        _user!.username,
+        token: _token,
+      );
+      
+      _isLoadingHistory = false;
+      notifyListeners();
+    } catch (e) {
+      print('Error fetching login history: $e');
+      _isLoadingHistory = false;
+      notifyListeners();
+    }
   }
 }

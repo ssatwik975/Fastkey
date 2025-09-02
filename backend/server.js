@@ -1152,3 +1152,41 @@ app.post('/mobile/approve-login', async (req, res) => {
     return res.status(500).json({ error: 'Server error during login approval' });
   }
 });
+
+// New endpoint to check recent successful authentications by username
+
+app.get('/api/recent-auths/:username', (req, res) => {
+  const { username } = req.params;
+  const successfulAuths = global.successfulAuths || new Map();
+  
+  // Check all successful auths for matching username
+  for (const [sessionId, authData] of successfulAuths.entries()) {
+    if (authData.username === username) {
+      console.log(`Found recent auth for ${username}, session ${sessionId}`);
+      
+      // Generate a JWT token for the user
+      const user = {
+        username: authData.username,
+        _id: crypto.randomBytes(12).toString('hex')
+      };
+      
+      const token = jwt.sign(
+        { id: user._id, username: user.username },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+      
+      // Remove from map after retrieving to prevent reuse
+      successfulAuths.delete(sessionId);
+      
+      return res.json({
+        success: true,
+        username: authData.username,
+        token,
+        deviceId: crypto.randomBytes(16).toString('hex')
+      });
+    }
+  }
+  
+  return res.json({ success: false, message: 'No recent authentication found for this user' });
+});

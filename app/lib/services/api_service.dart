@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:fastkey/models/login_history.dart';
 
 class ApiResponse {
   final bool success;
@@ -86,5 +87,22 @@ class ApiService {
         errorMessage: 'Network error: ${e.toString()}',
       );
     }
+  }
+  
+  // Add a method to check authentication status
+  Future<ApiResponse> checkAuthStatus(String sessionId) async {
+    return get('/api/auth-status/$sessionId');
+  }
+  
+  // Add a method to fetch login history
+  Future<List<LoginHistory>> getLoginHistory(String username, {String? token}) async {
+    final response = await get('/api/login-history/$username', token: token);
+    
+    if (response.success && response.data != null) {
+      final List<dynamic> historyData = response.data['history'] ?? [];
+      return historyData.map((item) => LoginHistory.fromJson(item)).toList();
+    }
+    
+    return [];
   }
 }

@@ -3,6 +3,7 @@ class LoginRequest {
   final String username;
   final DateTime timestamp;
   final String? deviceInfo;
+  final String? location;  // Added location for better history tracking
   bool approved;
   bool denied;
 
@@ -11,6 +12,7 @@ class LoginRequest {
     required this.username,
     required this.timestamp,
     this.deviceInfo,
+    this.location,
     this.approved = false,
     this.denied = false,
   });
@@ -23,6 +25,7 @@ class LoginRequest {
           ? DateTime.parse(json['timestamp'])
           : DateTime.now(),
       deviceInfo: json['deviceInfo'],
+      location: json['location'],
       approved: json['approved'] ?? false,
       denied: json['denied'] ?? false,
     );
@@ -34,6 +37,7 @@ class LoginRequest {
       'username': username,
       'timestamp': timestamp.toIso8601String(),
       'deviceInfo': deviceInfo,
+      'location': location,
       'approved': approved,
       'denied': denied,
     };

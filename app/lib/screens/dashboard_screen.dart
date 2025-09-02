@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import 'package:fastkey/providers/auth_provider.dart';
-import 'package:fastkey/services/socket_service.dart';
-import 'package:fastkey/screens/onboarding_screen.dart';
+import 'package:fastkey/providers/approval_provider.dart';
+import 'package:fastkey/screens/auth_screen.dart';
+import 'package:fastkey/models/login_history.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -12,627 +13,385 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen>
-    with TickerProviderStateMixin {
-  final SocketService _socketService = SocketService();
-  bool _isConnected = false;
-  int _pendingRequests = 0;
-  
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-
+class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-    
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    ));
-    
-    _initializeSocket();
-    _animationController.forward();
-  }
-
-  Future<void> _initializeSocket() async {
-    try {
-      await _socketService.initialize();
-      setState(() => _isConnected = _socketService.isConnected());
-      
-      // Listen for login requests
-      _socketService.onLoginRequest((request) {
-        setState(() => _pendingRequests++);
-        _showLoginRequestDialog(request);
-      });
-    } catch (e) {
-      setState(() => _isConnected = false);
-    }
-  }
-
-  @override
-  void dispose() {
-    _socketService.disconnect();
-    _animationController.dispose();
-    super.dispose();
+    // Refresh login history on init
+    Future.microtask(() {
+      Provider.of<AuthProvider>(context, listen: false).fetchLoginHistory();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F2F7),
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: CustomScrollView(
-          slivers: [
-            // App bar
-            SliverAppBar(
-              expandedHeight: 120,
-              floating: true,
-              pinned: true,
-              elevation: 0,
-              backgroundColor: Colors.white,
-              flexibleSpace: FlexibleSpaceBar(
-                title: Text(
-                  'Dashboard',
-                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                    fontSize: 28,
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Dashboard'),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        actions: [
+          IconButton(
+            onPressed: () => _showLogoutDialog(context),
+            icon: const Icon(Icons.logout_rounded),
+            tooltip: 'Sign Out',
+          ),
+        ],
+      ),
+      body: Consumer<AuthProvider>(
+        builder: (context, authProvider, _) {
+          final user = authProvider.user;
+          
+          if (user == null) {
+            return const Center(
+              child: Text('User not authenticated'),
+            );
+          }
+          
+          return RefreshIndicator(
+            onRefresh: () => authProvider.fetchLoginHistory(),
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                // Greeting card
+                Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                ),
-                titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
-              ),
-              actions: [
-                IconButton(
-                  onPressed: () => _showSettingsSheet(context, authProvider),
-                  icon: CircleAvatar(
-                    backgroundColor: const Color(0xFF007AFF),
-                    child: Text(
-                      authProvider.user?.username?.substring(0, 1).toUpperCase() ?? 'U', // Fixed: Use user.username
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  elevation: 0,
+                  color: const Color(0xFF2563EB),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.waving_hand_rounded,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Welcome, ${user.username}!',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Your account is secured with biometric authentication.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF30D158),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Active',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(width: 20),
-              ],
-            ),
-            
-            // Content
-            SliverPadding(
-              padding: const EdgeInsets.all(20),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  // Welcome card
-                  _buildWelcomeCard(authProvider),
-                  
-                  const SizedBox(height: 20),
-                  
-                  // Status card
-                  _buildStatusCard(),
-                  
-                  const SizedBox(height: 20),
-                  
-                  // Quick actions
-                  _buildQuickActions(),
-                  
-                  const SizedBox(height: 20),
-                  
-                  // Security tips
-                  _buildSecurityTips(),
-                  
-                  const SizedBox(height: 100), // Bottom padding
-                ]),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWelcomeCard(AuthProvider authProvider) {
-    return Card(
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF007AFF), Color(0xFF5856D6)],
-          ),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.waving_hand_rounded,
-                  color: Colors.white,
-                  size: 24,
+                
+                const SizedBox(height: 24),
+                
+                // Pending requests
+                Consumer<ApprovalProvider>(
+                  builder: (context, approvalProvider, _) {
+                    if (approvalProvider.hasPendingRequests) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Pending Approvals',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          ...approvalProvider.pendingRequests.map((request) {
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              color: const Color(0xFFFFF9C4),
+                              child: ListTile(
+                                leading: const CircleAvatar(
+                                  backgroundColor: Color(0xFFFFB300),
+                                  child: Icon(
+                                    Icons.warning_amber_rounded,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                title: Text(
+                                  'Login request from ${request.deviceInfo ?? 'unknown device'}',
+                                ),
+                                subtitle: Text(
+                                  DateFormat('MMM d, h:mm a').format(request.timestamp),
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.cancel_outlined,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed: () {
+                                        approvalProvider.denyLogin(request);
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.check_circle_outline,
+                                        color: Colors.green,
+                                      ),
+                                      onPressed: () {
+                                        approvalProvider.approveLogin(request);
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                          const SizedBox(height: 16),
+                        ],
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  'Welcome back!',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: Colors.white,
+                
+                // Login history
+                const Text(
+                  'Login History',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ],
-            ),
-            
-            const SizedBox(height: 8),
-            
-            Text(
-              'Hello ${authProvider.user?.username ?? 'User'}, you\'re all set up and ready to use FastKey for secure authentication.', // Fixed: Use user.username
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.white.withOpacity(0.9),
-                height: 1.4,
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+                
+                const SizedBox(height: 12),
+                
+                if (authProvider.isLoadingHistory)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else if (authProvider.loginHistory.isEmpty)
                   Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF30D158),
-                      shape: BoxShape.circle,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF2F2F7),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Account Active',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.history_rounded,
+                          size: 48,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No login history yet',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Your recent login activity will appear here',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
+                  )
+                else
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: authProvider.loginHistory.length,
+                    separatorBuilder: (context, index) => const Divider(),
+                    itemBuilder: (context, index) {
+                      final history = authProvider.loginHistory[index];
+                      return _buildLoginHistoryItem(history);
+                    },
                   ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatusCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  _isConnected ? Icons.wifi_rounded : Icons.wifi_off_rounded,
-                  color: _isConnected ? const Color(0xFF30D158) : const Color(0xFFFF3B30),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Connection Status',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 12),
-            
-            Text(
-              _isConnected 
-                  ? 'Connected and ready to receive authentication requests'
-                  : 'Disconnected - trying to reconnect...',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFF8E8E93),
-              ),
-            ),
-            
-            if (_pendingRequests > 0) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF9F0A).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: const Color(0xFFFF9F0A).withOpacity(0.3),
+                
+                const SizedBox(height: 24),
+                
+                // Security info
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF2F2F7),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.notifications_active_rounded,
-                      color: Color(0xFFFF9F0A),
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '$_pendingRequests pending authentication${_pendingRequests > 1 ? 's' : ''}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFFFF9F0A),
-                        fontWeight: FontWeight.w500,
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.security_rounded,
+                          color: Color(0xFF30D158),
+                          size: 24,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickActions() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Quick Actions',
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
-        
-        const SizedBox(height: 12),
-        
-        Row(
-          children: [
-            Expanded(
-              child: _buildActionCard(
-                icon: Icons.qr_code_scanner_rounded,
-                title: 'Scan QR',
-                subtitle: 'Authenticate manually',
-                onTap: () => _showComingSoonSnackBar('QR Scanner'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildActionCard(
-                icon: Icons.history_rounded,
-                title: 'Activity',
-                subtitle: 'View recent logins',
-                onTap: () => _showComingSoonSnackBar('Activity Log'),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF007AFF).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  icon,
-                  color: const Color(0xFF007AFF),
-                  size: 20,
-                ),
-              ),
-              
-              const SizedBox(height: 12),
-              
-              Text(
-                title,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              
-              const SizedBox(height: 4),
-              
-              Text(
-                subtitle,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSecurityTips() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Security Tips',
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
-        
-        const SizedBox(height: 12),
-        
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                _buildTip(
-                  icon: Icons.update_rounded,
-                  title: 'Keep your device updated',
-                  description: 'Install the latest security patches for optimal protection.',
-                ),
-                
-                const SizedBox(height: 16),
-                
-                _buildTip(
-                  icon: Icons.lock_outline_rounded,
-                  title: 'Use strong device security',
-                  description: 'Enable screen lock and biometric authentication on your device.',
-                ),
-                
-                const SizedBox(height: 16),
-                
-                _buildTip(
-                  icon: Icons.visibility_off_rounded,
-                  title: 'Protect your privacy',
-                  description: 'Your biometric data never leaves your device and stays private.',
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Your Security',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Your biometric data never leaves your device. FastKey uses FIDO2 standards to ensure security and privacy.',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF8E8E93),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTip({
-    required IconData icon,
-    required String title,
-    required String description,
-  }) {
-    return Row(
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: const Color(0xFF30D158).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            icon,
-            color: const Color(0xFF30D158),
-            size: 18,
-          ),
-        ),
-        
-        const SizedBox(width: 12),
-        
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                description,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showSettingsSheet(BuildContext context, AuthProvider authProvider) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handle
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFD1D1D6),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              
-              const SizedBox(height: 20),
-              
-              Text(
-                'Settings',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              
-              const SizedBox(height: 20),
-              
-              ListTile(
-                leading: const Icon(Icons.person_outline_rounded),
-                title: const Text('Account'),
-                subtitle: Text(authProvider.user?.username ?? 'Unknown'), // Fixed: Use user.username
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => _showComingSoonSnackBar('Account Settings'),
-              ),
-              
-              ListTile(
-                leading: const Icon(Icons.security_rounded),
-                title: const Text('Security'),
-                subtitle: const Text('Manage your biometric settings'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => _showComingSoonSnackBar('Security Settings'),
-              ),
-              
-              ListTile(
-                leading: const Icon(Icons.help_outline_rounded),
-                title: const Text('Help & Support'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => _showComingSoonSnackBar('Help & Support'),
-              ),
-              
-              const Divider(),
-              
-              ListTile(
-                leading: const Icon(Icons.logout_rounded, color: Color(0xFFFF3B30)),
-                title: const Text('Sign Out', style: TextStyle(color: Color(0xFFFF3B30))),
-                onTap: () async {
-                  Navigator.pop(context);
-                  await _signOut(authProvider);
-                },
-              ),
-            ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }
+  
+  Widget _buildLoginHistoryItem(LoginHistory history) {
+    final date = DateFormat('MMM d, yyyy').format(history.timestamp);
+    final time = DateFormat('h:mm a').format(history.timestamp);
+    
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: history.successful 
+            ? const Color(0xFF30D158) 
+            : const Color(0xFFFF3B30),
+        child: Icon(
+          history.successful ? Icons.check : Icons.close,
+          color: Colors.white,
+        ),
+      ),
+      title: Text(
+        history.successful ? 'Successful login' : 'Failed login attempt',
+        style: const TextStyle(fontWeight: FontWeight.w500),
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 4),
+          Text('Date: $date at $time'),
+          if (history.deviceInfo != null)
+            Text('Device: ${history.deviceInfo}'),
+          if (history.location != null)
+            Text('Location: ${history.location}'),
+        ],
+      ),
+      isThreeLine: true,
+    );
+  }
 
-  Future<void> _signOut(AuthProvider authProvider) async {
-    final confirmed = await showDialog<bool>(
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Sign Out'),
         content: const Text('Are you sure you want to sign out?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () {
+              Navigator.pop(context);
+              Provider.of<AuthProvider>(context, listen: false).logout();
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const AuthScreen()),
+                (route) => false,
+              );
+            },
             style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFFFF3B30),
+              foregroundColor: Colors.red,
             ),
             child: const Text('Sign Out'),
           ),
         ],
-      ),
-    );
-    
-    if (confirmed == true) {
-      await authProvider.logout(); // Fixed: Use logout instead of signOut
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const OnboardingScreen()),
-          (route) => false,
-        );
-      }
-    }
-  }
-
-  void _showLoginRequestDialog(dynamic request) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFF007AFF).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.login_rounded,
-                color: Color(0xFF007AFF),
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text('Authentication Request'),
-          ],
-        ),
-        content: const Text('Someone is trying to log in to your account. Approve this request?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() => _pendingRequests--);
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFFFF3B30),
-            ),
-            child: const Text('Deny'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() => _pendingRequests--);
-              HapticFeedback.lightImpact(); // Fixed: Use lightImpact instead of successImpact
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF30D158),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Approve'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showComingSoonSnackBar(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$feature coming soon!'),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
       ),
     );
   }
