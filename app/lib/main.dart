@@ -157,24 +157,39 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     
-    // Check authentication state and navigate accordingly
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        
-        if (authProvider.isAuthenticated) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const DashboardScreen()),
-          );
-        } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const AuthScreen()),
-          );
-        }
-      }
+    // Listen to the AuthProvider to navigate when the auth state is determined.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      // The listener will be called once the status changes from loading.
+      authProvider.addListener(_onAuthStateChanged);
     });
+  }
+
+  void _onAuthStateChanged() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    // We only care about the first time the state is not loading/initial.
+    if (authProvider.status != AuthStatus.loading && authProvider.status != AuthStatus.initial) {
+      if (mounted) {
+        // Remove the listener to avoid multiple navigations.
+        authProvider.removeListener(_onAuthStateChanged);
+        
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => authProvider.isAuthenticated
+                ? const DashboardScreen()
+                : const AuthScreen(),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    // Clean up the listener if the widget is disposed.
+    Provider.of<AuthProvider>(context, listen: false).removeListener(_onAuthStateChanged);
+    super.dispose();
   }
 
   @override
