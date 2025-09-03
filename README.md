@@ -13,7 +13,7 @@ It provides biometric authentication (fingerprint, Face ID, hardware keys) with 
 
 * **Standards-First** – Built on FIDO2/WebAuthn (no vendor lock-in, enterprise-ready).
 * **Device-Centric Security** – Zero-knowledge design; biometric templates never transmitted or stored centrally.
-* **Cross-Platform** – Flutter for iOS/Android, Next.js for web, Node.js backend.
+* **Cross-Platform** – Flutter for the app, Next.js for web, Node.js backend.
 * **Offline Capability** – Authentication works even without a live internet connection.
 * **Operationally Practical** – Docker support, structured logging, production-ready APIs.
 
@@ -38,7 +38,7 @@ It provides biometric authentication (fingerprint, Face ID, hardware keys) with 
 
 ### Platform Support
 
-* **Mobile:** Flutter app (iOS & Android) with offline mode, push notifications, and lightweight background footprint
+* **Mobile:** Flutter app with push notifications, and lightweight background footprint
 * **Web:** Next.js dashboard with admin panel, user/device management, and real-time monitoring
 
 ---
