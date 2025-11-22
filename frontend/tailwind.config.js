@@ -9,6 +9,13 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        firebase: {
+          orange: '#FFCA28',
+          dark: '#000000',
+          gray: '#202124',
+          lime: '#CCFF00',
+          text: '#9CA3AF',
+        },
         primary: {
           50: '#f0f9ff',
           100: '#e0f2fe',
